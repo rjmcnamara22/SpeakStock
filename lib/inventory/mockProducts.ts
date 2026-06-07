@@ -21,8 +21,8 @@ export const mockProducts: InventoryProduct[] = [
   },
   {
     id: "4",
-    name: "Guinness Can",
-    aliases: ["guinness", "guinness can"],
+    name: "Pabst Blue Ribbon Can",
+    aliases: ["pabst", "pabst blue ribbon", "pabst blue ribbon can"],
     squareCount: 35,
   },
 ];

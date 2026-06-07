@@ -30,7 +30,7 @@ export default function InventoryPage() {
       const parsedCommand = parseCountCommand(command);
       const matchedProduct = matchProduct(
         parsedCommand.productText,
-        mockProducts
+        mockProducts,
       );
 
       const newEntry: CountEntry = {
@@ -63,6 +63,24 @@ export default function InventoryPage() {
     setError(null);
   }
 
+  function handleDeleteEntry(entryId: string) {
+    setEntries((currentEntries) =>
+      currentEntries.filter((entry) => entry.id !== entryId),
+    );
+  }
+
+  function handleResetProduct(productId: string) {
+    setEntries((currentEntries) =>
+      currentEntries.filter((entry) => entry.productId !== productId),
+    );
+  }
+
+  function getDifferenceLabel(difference: number): string {
+    if (difference < 0) return "Lost";
+    if (difference > 0) return "Received";
+    return "No correction";
+  }
+
   return (
     <main className="min-h-screen bg-zinc-950 px-6 py-8 text-zinc-100">
       <div className="mx-auto max-w-6xl space-y-8">
@@ -70,16 +88,12 @@ export default function InventoryPage() {
           <p className="text-sm font-semibold uppercase tracking-wide text-emerald-400">
             SpeakStock MVP
           </p>
-          <h1 className="mt-2 text-3xl font-bold">
-            Inventory Count Session
-          </h1>
+          <h1 className="mt-2 text-3xl font-bold">Inventory Count Session</h1>
           <p className="mt-2 max-w-2xl text-zinc-400">
             Type a count like{" "}
-            <span className="font-semibold text-zinc-200">
-              Miller Lite 48
-            </span>
-            . Each entry adds to the local physical count. At the end, review
-            the difference between the local count and Square count.
+            <span className="font-semibold text-zinc-200">Miller Lite 48</span>.
+            Each entry adds to the local physical count. At the end, review the
+            difference between the local count and Square count.
           </p>
         </section>
 
@@ -165,7 +179,9 @@ export default function InventoryPage() {
                             : "text-red-400"
                       }`}
                     >
-                      {row.difference > 0 ? `+${row.difference}` : row.difference}
+                      {row.difference > 0
+                        ? `+${row.difference}`
+                        : row.difference}
                     </td>
                   </tr>
                 ))}
@@ -191,16 +207,22 @@ export default function InventoryPage() {
                     <th className="py-3 pr-4 text-right">Square</th>
                     <th className="py-3 pr-4 text-right">Physical Count</th>
                     <th className="py-3 pr-4 text-right">Difference</th>
+                    <th className="py-3 pr-4 text-right">Label</th>
                     <th className="py-3 pr-4 text-right">Future Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {discrepancyRows.map((row) => (
-                    <tr key={row.productId} className="border-b border-zinc-800">
+                    <tr
+                      key={row.productId}
+                      className="border-b border-zinc-800"
+                    >
                       <td className="py-3 pr-4 font-medium">
                         {row.productName}
                       </td>
-                      <td className="py-3 pr-4 text-right">{row.squareCount}</td>
+                      <td className="py-3 pr-4 text-right">
+                        {row.squareCount}
+                      </td>
                       <td className="py-3 pr-4 text-right">{row.localCount}</td>
                       <td
                         className={`py-3 pr-4 text-right font-semibold ${
@@ -213,6 +235,11 @@ export default function InventoryPage() {
                           ? `+${row.difference}`
                           : row.difference}
                       </td>
+
+                      <td className="py-3 pr-4 text-right text-zinc-300">
+                        {getDifferenceLabel(row.difference)}
+                      </td>
+
                       <td className="py-3 pr-4 text-right text-zinc-300">
                         Set Square to {row.localCount}
                       </td>
