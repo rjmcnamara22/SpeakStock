@@ -162,6 +162,7 @@ export default function InventoryPage() {
                   <th className="py-3 pr-4 text-right">Square</th>
                   <th className="py-3 pr-4 text-right">Counted</th>
                   <th className="py-3 pr-4 text-right">Difference</th>
+                  <th className="py-3 pr-4 text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -182,6 +183,15 @@ export default function InventoryPage() {
                       {row.difference > 0
                         ? `+${row.difference}`
                         : row.difference}
+                    </td>
+                    <td className="py-3 pr-4 text-right">
+                      <button
+                        onClick={() => handleResetProduct(row.productId)}
+                        disabled={row.localCount === 0}
+                        className="rounded-md border border-zinc-700 px-3 py-1 text-xs font-semibold text-zinc-300 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Reset Count
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -274,6 +284,7 @@ export default function InventoryPage() {
                     <th className="py-3 pr-4 text-right">Quantity</th>
                     <th className="py-3 pr-4">Raw Input</th>
                     <th className="py-3 pr-4">Source</th>
+                    <th className="py-3 pr-4 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -288,6 +299,14 @@ export default function InventoryPage() {
                       </td>
                       <td className="py-3 pr-4 text-zinc-400">
                         {entry.source}
+                      </td>
+                      <td className="py-3 pr-4 text-right">
+                        <button
+                          onClick={() => handleDeleteEntry(entry.id)}
+                          className="rounded-md border border-red-900 px-3 py-1 text-xs font-semibold text-red-300 hover:bg-red-950"
+                        >
+                          Delete
+                        </button>
                       </td>
                     </tr>
                   ))}
