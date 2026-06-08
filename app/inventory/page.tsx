@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { CountEntry } from "@/types/inventory";
+import type { CountEntry, InventorySubmissionPreview } from "@/types/inventory";
 import { mockProducts } from "@/lib/inventory/mockProducts";
 import { parseCountCommand } from "@/lib/inventory/parser";
 import { matchProduct } from "@/lib/inventory/matcher";
@@ -54,6 +54,10 @@ export default function InventoryPage() {
   const [isListening, setIsListening] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isReviewConfirmed, setIsReviewConfirmed] = useState(false);
+  const [submissionPreview, setSubmissionPreview] = useState<
+    InventorySubmissionPreview[] | null
+  >(null);
 
   const summaryRows = useMemo(() => {
     return buildInventorySummary(mockProducts, entries);
@@ -68,6 +72,8 @@ export default function InventoryPage() {
       setError(null);
       setVoiceError(null);
       setSuccessMessage(null);
+      setSubmissionPreview(null);
+      setIsReviewConfirmed(false);
 
       const parsedCommand = parseCountCommand(command);
       const matchedProduct = matchProduct(
@@ -103,29 +109,79 @@ export default function InventoryPage() {
 
   function handleUndoLastEntry() {
     setEntries((currentEntries) => currentEntries.slice(0, -1));
+    setSubmissionPreview(null);
+    setIsReviewConfirmed(false);
   }
 
   function handleClearSession() {
     setEntries([]);
     setError(null);
+    setVoiceError(null);
+    setSuccessMessage(null);
+    setSubmissionPreview(null);
+    setIsReviewConfirmed(false);
   }
 
   function handleDeleteEntry(entryId: string) {
     setEntries((currentEntries) =>
       currentEntries.filter((entry) => entry.id !== entryId),
     );
+    setSubmissionPreview(null);
+    setIsReviewConfirmed(false);
   }
 
   function handleResetProduct(productId: string) {
     setEntries((currentEntries) =>
       currentEntries.filter((entry) => entry.productId !== productId),
     );
+    setSubmissionPreview(null);
+    setIsReviewConfirmed(false);
   }
 
   function getDifferenceLabel(difference: number): string {
     if (difference < 0) return "Lost";
     if (difference > 0) return "Received";
     return "No correction";
+  }
+
+  function getSubmissionLabel(difference: number): "Lost" | "Received" {
+    return difference < 0 ? "Lost" : "Received";
+  }
+
+  function buildSubmissionPreview(): InventorySubmissionPreview[] {
+    return discrepancyRows.map((row) => ({
+      productId: row.productId,
+      productName: row.productName,
+      squareCount: row.squareCount,
+      physicalCount: row.localCount,
+      difference: row.difference,
+      label: getSubmissionLabel(row.difference),
+    }));
+  }
+
+  function handlePreviewSubmission() {
+    setError(null);
+    setVoiceError(null);
+    setSuccessMessage(null);
+
+    if (discrepancyRows.length === 0) {
+      setError("There are no inventory differences to submit.");
+      return;
+    }
+
+    if (!isReviewConfirmed) {
+      setError(
+        "Please confirm that you reviewed the corrections before continuing.",
+      );
+      return;
+    }
+
+    setSubmissionPreview(buildSubmissionPreview());
+    setSuccessMessage(
+      `Prepared ${discrepancyRows.length} correction${
+        discrepancyRows.length === 1 ? "" : "s"
+      } for future Square sync.`,
+    );
   }
 
   function handleStartVoiceInput() {
@@ -376,13 +432,91 @@ export default function InventoryPage() {
             </div>
           )}
 
-          <button
-            disabled
-            className="mt-5 rounded-lg bg-zinc-700 px-5 py-3 font-semibold text-zinc-400"
-          >
-            Submit to Square Coming Soon
-          </button>
+          <div className="mt-5 space-y-4">
+            <label className="flex items-start gap-3 rounded-lg border border-zinc-800 bg-zinc-950 p-4 text-sm text-zinc-300">
+              <input
+                type="checkbox"
+                checked={isReviewConfirmed}
+                onChange={(event) => setIsReviewConfirmed(event.target.checked)}
+                disabled={discrepancyRows.length === 0}
+                className="mt-1 h-4 w-4"
+              />
+              <span>
+                I reviewed these inventory differences and confirm that the
+                physical counts are accurate.
+              </span>
+            </label>
+
+            <button
+              onClick={handlePreviewSubmission}
+              disabled={discrepancyRows.length === 0 || !isReviewConfirmed}
+              className="rounded-lg bg-emerald-500 px-5 py-3 font-semibold text-zinc-950 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400"
+            >
+              Preview Future Square Sync
+            </button>
+          </div>
         </section>
+
+        {submissionPreview && (
+          <section className="rounded-xl border border-emerald-900 bg-emerald-950/30 p-5">
+            <h2 className="text-xl font-semibold text-emerald-200">
+              Future Square Sync Preview
+            </h2>
+
+            <p className="mt-2 text-sm text-emerald-100/80">
+              These are the physical counts that would be submitted to Square
+              after final confirmation. Square integration is not connected yet.
+            </p>
+
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full border-collapse text-left text-sm">
+                <thead>
+                  <tr className="border-b border-emerald-900 text-emerald-100/70">
+                    <th className="py-3 pr-4">Product</th>
+                    <th className="py-3 pr-4 text-right">Square Count</th>
+                    <th className="py-3 pr-4 text-right">Physical Count</th>
+                    <th className="py-3 pr-4 text-right">Difference</th>
+                    <th className="py-3 pr-4 text-right">Label</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {submissionPreview.map((item) => (
+                    <tr
+                      key={item.productId}
+                      className="border-b border-emerald-900/60"
+                    >
+                      <td className="py-3 pr-4 font-medium">
+                        {item.productName}
+                      </td>
+                      <td className="py-3 pr-4 text-right">
+                        {item.squareCount}
+                      </td>
+                      <td className="py-3 pr-4 text-right">
+                        {item.physicalCount}
+                      </td>
+                      <td
+                        className={`py-3 pr-4 text-right font-semibold ${
+                          item.difference > 0
+                            ? "text-emerald-300"
+                            : "text-red-300"
+                        }`}
+                      >
+                        {item.difference > 0
+                          ? `+${item.difference}`
+                          : item.difference}
+                      </td>
+                      <td className="py-3 pr-4 text-right">{item.label}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <pre className="mt-4 overflow-x-auto rounded-lg border border-emerald-900 bg-zinc-950 p-4 text-xs text-emerald-100">
+              {JSON.stringify(submissionPreview, null, 2)}
+            </pre>
+          </section>
+        )}
 
         <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
           <h2 className="text-xl font-semibold">Entry Log</h2>

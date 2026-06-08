@@ -40,3 +40,12 @@ export type InventorySummaryRow = {
   localCount: number;
   difference: number;
 };
+
+export type InventorySubmissionPreview = {
+  productId: string;
+  productName: string;
+  squareCount: number;
+  physicalCount: number;
+  difference: number;
+  label: "Lost" | "Received";
+};
