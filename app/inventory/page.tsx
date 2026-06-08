@@ -53,6 +53,7 @@ export default function InventoryPage() {
   const [error, setError] = useState<string | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const summaryRows = useMemo(() => {
     return buildInventorySummary(mockProducts, entries);
@@ -65,6 +66,8 @@ export default function InventoryPage() {
   function handleAddEntry() {
     try {
       setError(null);
+      setVoiceError(null);
+      setSuccessMessage(null);
 
       const parsedCommand = parseCountCommand(command);
       const matchedProduct = matchProduct(
@@ -83,6 +86,11 @@ export default function InventoryPage() {
       };
 
       setEntries((currentEntries) => [...currentEntries, newEntry]);
+
+      setSuccessMessage(
+        `Added ${parsedCommand.quantity} to ${matchedProduct.product.name}. Matched from "${matchedProduct.matchedAlias}".`,
+      );
+
       setCommand("");
     } catch (caughtError) {
       if (caughtError instanceof Error) {
@@ -240,6 +248,12 @@ export default function InventoryPage() {
           {voiceError && (
             <p className="mt-3 rounded-lg border border-yellow-900 bg-yellow-950 px-4 py-3 text-sm text-yellow-200">
               {voiceError}
+            </p>
+          )}
+
+          {successMessage && (
+            <p className="mt-3 rounded-lg border border-emerald-900 bg-emerald-950 px-4 py-3 text-sm text-emerald-200">
+              {successMessage}
             </p>
           )}
         </section>

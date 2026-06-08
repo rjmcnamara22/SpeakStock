@@ -24,6 +24,13 @@ export type ParsedCountCommand = {
 export type MatchedProduct = {
   product: InventoryProduct;
   matchedAlias: string;
+  score: number;
+};
+
+export type ProductSuggestion = {
+  product: InventoryProduct;
+  matchedAlias: string;
+  score: number;
 };
 
 export type InventorySummaryRow = {
