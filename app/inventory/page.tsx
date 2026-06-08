@@ -10,10 +10,49 @@ import {
   getDiscrepancyRows,
 } from "@/lib/inventory/session";
 
+type SpeechRecognitionResultLike = {
+  transcript: string;
+};
+
+type SpeechRecognitionEventLike = Event & {
+  results: {
+    [index: number]: {
+      [index: number]: SpeechRecognitionResultLike;
+    };
+  };
+};
+
+type SpeechRecognitionErrorEventLike = Event & {
+  error: string;
+};
+
+type SpeechRecognitionLike = {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  start: () => void;
+  stop: () => void;
+  onstart: (() => void) | null;
+  onend: (() => void) | null;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
+};
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  }
+}
+
 export default function InventoryPage() {
   const [command, setCommand] = useState("");
   const [entries, setEntries] = useState<CountEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [isListening, setIsListening] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
 
   const summaryRows = useMemo(() => {
     return buildInventorySummary(mockProducts, entries);
@@ -81,6 +120,55 @@ export default function InventoryPage() {
     return "No correction";
   }
 
+  function handleStartVoiceInput() {
+    setError(null);
+    setVoiceError(null);
+
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      setVoiceError(
+        "Voice input is not supported in this browser. Try Chrome or Edge, or use typed input.",
+      );
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+
+    recognition.lang = "en-US";
+    recognition.interimResults = false;
+    recognition.continuous = false;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.onerror = (event) => {
+      setIsListening(false);
+      setVoiceError(`Voice input error: ${event.error}`);
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0]?.[0]?.transcript;
+
+      if (!transcript) {
+        setVoiceError(
+          "Could not understand the voice input. Please try again.",
+        );
+        return;
+      }
+
+      setCommand(transcript.trim());
+    };
+
+    recognition.start();
+  }
+
   return (
     <main className="min-h-screen bg-zinc-950 px-6 py-8 text-zinc-100">
       <div className="mx-auto max-w-6xl space-y-8">
@@ -120,6 +208,14 @@ export default function InventoryPage() {
             />
 
             <button
+              onClick={handleStartVoiceInput}
+              disabled={isListening}
+              className="rounded-lg border border-emerald-700 px-5 py-3 font-semibold text-emerald-300 hover:bg-emerald-950 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isListening ? "Listening..." : "Use Voice"}
+            </button>
+
+            <button
               onClick={handleAddEntry}
               className="rounded-lg bg-emerald-500 px-5 py-3 font-semibold text-zinc-950 hover:bg-emerald-400"
             >
@@ -138,6 +234,12 @@ export default function InventoryPage() {
           {error && (
             <p className="mt-3 rounded-lg border border-red-900 bg-red-950 px-4 py-3 text-sm text-red-200">
               {error}
+            </p>
+          )}
+
+          {voiceError && (
+            <p className="mt-3 rounded-lg border border-yellow-900 bg-yellow-950 px-4 py-3 text-sm text-yellow-200">
+              {voiceError}
             </p>
           )}
         </section>
