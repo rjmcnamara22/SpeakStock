@@ -12,6 +12,7 @@ import {
   buildInventorySummary,
   getDiscrepancyRows,
 } from "@/lib/inventory/session";
+import { productAliasOverrides } from "@/lib/inventory/productAliasOverrides";
 
 type SpeechRecognitionResultLike = {
   transcript: string;

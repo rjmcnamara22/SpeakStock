@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { squareClient } from "@/lib/square/client";
+import { productAliasOverrides } from "@/lib/inventory/productAliasOverrides";
 
 type SpeakStockProduct = {
   id: string;
@@ -103,13 +104,40 @@ function buildProductName(
   return `${itemName} ${variationName}`;
 }
 
+function normalizeAlias(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function removeInventoryDescriptorWords(value: string): string {
+  return normalizeAlias(value)
+    .replace(/\b\d+(\.\d+)?\s*(oz|ounce|ounces|ml|l|liter|litre)\b/g, " ")
+    .replace(/\b(bottle|bottles|can|cans|draft|draught|regular)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function buildAliases(name: string): string[] {
-  const normalizedName = name.toLowerCase();
+  const normalizedName = normalizeAlias(name);
+  const simplifiedName = removeInventoryDescriptorWords(name);
+
+  const overrideAliases = [
+    ...(productAliasOverrides[normalizedName] ?? []),
+    ...(productAliasOverrides[simplifiedName] ?? []),
+  ];
 
   return Array.from(
     new Set([
       normalizedName,
-      normalizedName.replace(/\b(bottle|can|draft|regular)\b/g, "").trim(),
+      simplifiedName,
+      normalizedName.replace(/\bhi\b/g, "high"),
+      simplifiedName.replace(/\bhi\b/g, "high"),
+      normalizedName.replace(/\bhigh\b/g, "hi"),
+      simplifiedName.replace(/\bhigh\b/g, "hi"),
+      ...overrideAliases.map(normalizeAlias),
     ]),
   ).filter(Boolean);
 }
