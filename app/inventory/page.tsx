@@ -62,29 +62,12 @@ export default function InventoryPage() {
   const [submissionPreview, setSubmissionPreview] = useState<
     InventorySubmissionPreview[] | null
   >(null);
+  const [isSubmittingToSquare, setIsSubmittingToSquare] = useState(false);
   const [products, setProducts] = useState<InventoryProduct[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [productsError, setProductsError] = useState<string | null>(null);
-  const [entries, setEntries] = useState<CountEntry[]>(() => {
-    if (typeof window === "undefined") {
-      return [];
-    }
-
-    const savedEntries = window.localStorage.getItem(
-      INVENTORY_ENTRIES_STORAGE_KEY,
-    );
-
-    if (!savedEntries) {
-      return [];
-    }
-
-    try {
-      return JSON.parse(savedEntries) as CountEntry[];
-    } catch {
-      window.localStorage.removeItem(INVENTORY_ENTRIES_STORAGE_KEY);
-      return [];
-    }
-  });
+  const [entries, setEntries] = useState<CountEntry[]>([]);
+  const [hasLoadedEntries, setHasLoadedEntries] = useState(false);
 
   const summaryRows = useMemo(() => {
     return buildInventorySummary(products, entries);
@@ -94,42 +77,66 @@ export default function InventoryPage() {
     return getDiscrepancyRows(summaryRows);
   }, [summaryRows]);
 
+  async function loadProducts() {
+    try {
+      setIsLoadingProducts(true);
+      setProductsError(null);
+
+      const response = await fetch("/api/square/products");
+
+      if (!response.ok) {
+        throw new Error("Failed to load products from Square.");
+      }
+
+      const data = (await response.json()) as {
+        products?: InventoryProduct[];
+      };
+
+      setProducts(data.products ?? []);
+    } catch (caughtError) {
+      if (caughtError instanceof Error) {
+        setProductsError(caughtError.message);
+      } else {
+        setProductsError("Something went wrong while loading products.");
+      }
+    } finally {
+      setIsLoadingProducts(false);
+    }
+  }
+
   useEffect(() => {
+    if (!hasLoadedEntries) {
+      return;
+    }
+
     window.localStorage.setItem(
       INVENTORY_ENTRIES_STORAGE_KEY,
       JSON.stringify(entries),
     );
-  }, [entries]);
+  }, [entries, hasLoadedEntries]);
 
   useEffect(() => {
-    async function loadProducts() {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadProducts();
+  }, []);
+
+  useEffect(() => {
+    const savedEntries = window.localStorage.getItem(
+      INVENTORY_ENTRIES_STORAGE_KEY,
+    );
+
+    if (savedEntries) {
       try {
-        setIsLoadingProducts(true);
-        setProductsError(null);
+        const parsedEntries = JSON.parse(savedEntries) as CountEntry[];
 
-        const response = await fetch("/api/square/products");
-
-        if (!response.ok) {
-          throw new Error("Failed to load products from Square.");
-        }
-
-        const data = (await response.json()) as {
-          products?: InventoryProduct[];
-        };
-
-        setProducts(data.products ?? []);
-      } catch (caughtError) {
-        if (caughtError instanceof Error) {
-          setProductsError(caughtError.message);
-        } else {
-          setProductsError("Something went wrong while loading products.");
-        }
-      } finally {
-        setIsLoadingProducts(false);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setEntries(parsedEntries);
+      } catch {
+        window.localStorage.removeItem(INVENTORY_ENTRIES_STORAGE_KEY);
       }
     }
 
-    loadProducts();
+    setHasLoadedEntries(true);
   }, []);
 
   function handleAddEntry() {
@@ -252,6 +259,78 @@ export default function InventoryPage() {
         discrepancyRows.length === 1 ? "" : "s"
       } for future Square sync.`,
     );
+  }
+
+  async function handleSubmitToSquare() {
+    setError(null);
+    setVoiceError(null);
+    setSuccessMessage(null);
+
+    if (discrepancyRows.length === 0) {
+      setError("There are no inventory differences to submit.");
+      return;
+    }
+
+    if (!isReviewConfirmed) {
+      setError(
+        "Please confirm that you reviewed the corrections before submitting.",
+      );
+      return;
+    }
+
+    const preview = buildSubmissionPreview();
+
+    try {
+      setIsSubmittingToSquare(true);
+
+      const response = await fetch("/api/square/inventory/submit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          items: preview.map((item) => ({
+            productId: item.productId,
+            productName: item.productName,
+            physicalCount: item.physicalCount,
+          })),
+        }),
+      });
+
+      const data = (await response.json()) as {
+        success?: boolean;
+        submittedCount?: number;
+        error?: string;
+        details?: string;
+      };
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.details ?? data.error ?? "Square submission failed.",
+        );
+      }
+
+      setSubmissionPreview(preview);
+      setSuccessMessage(
+        `Submitted ${data.submittedCount ?? preview.length} correction${
+          (data.submittedCount ?? preview.length) === 1 ? "" : "s"
+        } to Square Sandbox.`,
+      );
+
+      setEntries([]);
+      setIsReviewConfirmed(false);
+      window.localStorage.removeItem(INVENTORY_ENTRIES_STORAGE_KEY);
+
+      await loadProducts();
+    } catch (caughtError) {
+      if (caughtError instanceof Error) {
+        setError(caughtError.message);
+      } else {
+        setError("Something went wrong while submitting to Square.");
+      }
+    } finally {
+      setIsSubmittingToSquare(false);
+    }
   }
 
   function handleStartVoiceInput() {
@@ -544,18 +623,32 @@ export default function InventoryPage() {
             >
               Preview Future Square Sync
             </button>
+
+            <button
+              onClick={handleSubmitToSquare}
+              disabled={
+                discrepancyRows.length === 0 ||
+                !isReviewConfirmed ||
+                isSubmittingToSquare
+              }
+              className="ml-0 rounded-lg bg-red-500 px-5 py-3 font-semibold text-white hover:bg-red-400 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400 sm:ml-3"
+            >
+              {isSubmittingToSquare
+                ? "Submitting..."
+                : "Submit to Square Sandbox"}
+            </button>
           </div>
         </section>
 
         {submissionPreview && (
           <section className="rounded-xl border border-emerald-900 bg-emerald-950/30 p-5">
             <h2 className="text-xl font-semibold text-emerald-200">
-              Future Square Sync Preview
+              Square Submission Preview
             </h2>
 
             <p className="mt-2 text-sm text-emerald-100/80">
-              These are the physical counts that would be submitted to Square
-              after final confirmation. Square integration is not connected yet.
+              These are the physical counts prepared for Square. If submitted,
+              Square will be updated to match the physical counts shown here.
             </p>
 
             <div className="mt-4 overflow-x-auto">
