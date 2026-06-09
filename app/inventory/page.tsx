@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CountEntry, InventorySubmissionPreview } from "@/types/inventory";
 import { mockProducts } from "@/lib/inventory/mockProducts";
 import { parseCountCommand } from "@/lib/inventory/parser";
@@ -47,6 +47,8 @@ declare global {
   }
 }
 
+const INVENTORY_ENTRIES_STORAGE_KEY = "speakstock_inventory_entries";
+
 export default function InventoryPage() {
   const [command, setCommand] = useState("");
   const [entries, setEntries] = useState<CountEntry[]>([]);
@@ -58,6 +60,7 @@ export default function InventoryPage() {
   const [submissionPreview, setSubmissionPreview] = useState<
     InventorySubmissionPreview[] | null
   >(null);
+  const [hasLoadedEntries, setHasLoadedEntries] = useState(false);
 
   const summaryRows = useMemo(() => {
     return buildInventorySummary(mockProducts, entries);
@@ -66,6 +69,34 @@ export default function InventoryPage() {
   const discrepancyRows = useMemo(() => {
     return getDiscrepancyRows(summaryRows);
   }, [summaryRows]);
+
+  useEffect(() => {
+    const savedEntries = window.localStorage.getItem(
+      INVENTORY_ENTRIES_STORAGE_KEY,
+    );
+
+    if (savedEntries) {
+      try {
+        const parsedEntries = JSON.parse(savedEntries) as CountEntry[];
+        setEntries(parsedEntries);
+      } catch {
+        window.localStorage.removeItem(INVENTORY_ENTRIES_STORAGE_KEY);
+      }
+    }
+
+    setHasLoadedEntries(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedEntries) {
+      return;
+    }
+
+    window.localStorage.setItem(
+      INVENTORY_ENTRIES_STORAGE_KEY,
+      JSON.stringify(entries),
+    );
+  }, [entries, hasLoadedEntries]);
 
   function handleAddEntry() {
     try {
@@ -120,6 +151,7 @@ export default function InventoryPage() {
     setSuccessMessage(null);
     setSubmissionPreview(null);
     setIsReviewConfirmed(false);
+    window.localStorage.removeItem(INVENTORY_ENTRIES_STORAGE_KEY);
   }
 
   function handleDeleteEntry(entryId: string) {
