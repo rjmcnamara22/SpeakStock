@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { CountEntry, InventorySubmissionPreview } from "@/types/inventory";
-import { mockProducts } from "@/lib/inventory/mockProducts";
+import type {
+  CountEntry,
+  InventoryProduct,
+  InventorySubmissionPreview,
+} from "@/types/inventory";
 import { parseCountCommand } from "@/lib/inventory/parser";
 import { matchProduct } from "@/lib/inventory/matcher";
 import {
@@ -61,10 +64,13 @@ export default function InventoryPage() {
     InventorySubmissionPreview[] | null
   >(null);
   const [hasLoadedEntries, setHasLoadedEntries] = useState(false);
+  const [products, setProducts] = useState<InventoryProduct[]>([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+  const [productsError, setProductsError] = useState<string | null>(null);
 
   const summaryRows = useMemo(() => {
-    return buildInventorySummary(mockProducts, entries);
-  }, [entries]);
+    return buildInventorySummary(products, entries);
+  }, [products, entries]);
 
   const discrepancyRows = useMemo(() => {
     return getDiscrepancyRows(summaryRows);
@@ -98,6 +104,37 @@ export default function InventoryPage() {
     );
   }, [entries, hasLoadedEntries]);
 
+  useEffect(() => {
+    async function loadProducts() {
+      try {
+        setIsLoadingProducts(true);
+        setProductsError(null);
+
+        const response = await fetch("/api/square/products");
+
+        if (!response.ok) {
+          throw new Error("Failed to load products from Square.");
+        }
+
+        const data = (await response.json()) as {
+          products?: InventoryProduct[];
+        };
+
+        setProducts(data.products ?? []);
+      } catch (caughtError) {
+        if (caughtError instanceof Error) {
+          setProductsError(caughtError.message);
+        } else {
+          setProductsError("Something went wrong while loading products.");
+        }
+      } finally {
+        setIsLoadingProducts(false);
+      }
+    }
+
+    loadProducts();
+  }, []);
+
   function handleAddEntry() {
     try {
       setError(null);
@@ -106,11 +143,15 @@ export default function InventoryPage() {
       setSubmissionPreview(null);
       setIsReviewConfirmed(false);
 
+      if (products.length === 0) {
+        setError(
+          "No products are loaded yet. Check your Square Sandbox products.",
+        );
+        return;
+      }
+
       const parsedCommand = parseCountCommand(command);
-      const matchedProduct = matchProduct(
-        parsedCommand.productText,
-        mockProducts,
-      );
+      const matchedProduct = matchProduct(parsedCommand.productText, products);
 
       const newEntry: CountEntry = {
         id: crypto.randomUUID(),
@@ -279,6 +320,25 @@ export default function InventoryPage() {
             Each entry adds to the local physical count. At the end, review the
             difference between the local count and Square count.
           </p>
+
+          {isLoadingProducts && (
+            <p className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-zinc-300">
+              Loading products from Square Sandbox...
+            </p>
+          )}
+
+          {productsError && (
+            <p className="mt-4 rounded-lg border border-red-900 bg-red-950 px-4 py-3 text-sm text-red-200">
+              {productsError}
+            </p>
+          )}
+
+          {!isLoadingProducts && !productsError && (
+            <p className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-zinc-300">
+              Loaded {products.length} product{products.length === 1 ? "" : "s"}{" "}
+              from Square Sandbox.
+            </p>
+          )}
         </section>
 
         <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
@@ -313,7 +373,8 @@ export default function InventoryPage() {
 
             <button
               onClick={handleAddEntry}
-              className="rounded-lg bg-emerald-500 px-5 py-3 font-semibold text-zinc-950 hover:bg-emerald-400"
+              disabled={isLoadingProducts || products.length === 0}
+              className="rounded-lg bg-emerald-500 px-5 py-3 font-semibold text-zinc-950 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400"
             >
               Add Count
             </button>
