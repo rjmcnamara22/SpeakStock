@@ -8,8 +8,21 @@ type SpeakStockProduct = {
   squareCount: number;
 };
 
-type SquareCatalogVariationLike = {
+type SquareCatalogItemLike = {
   id: string;
+  type?: string;
+  itemData?: {
+    name?: string;
+    variations?: SquareCatalogVariationLike[];
+  };
+  item_data?: {
+    name?: string;
+    variations?: SquareCatalogVariationLike[];
+  };
+};
+
+type SquareCatalogVariationLike = {
+  id?: string;
   type?: string;
   itemVariationData?: {
     name?: string;
@@ -26,9 +39,9 @@ type InventoryCountLike = {
   state?: string;
 };
 
-function isSquareCatalogVariationLike(
+function isSquareCatalogItemLike(
   value: unknown,
-): value is SquareCatalogVariationLike {
+): value is SquareCatalogItemLike {
   if (!value || typeof value !== "object") {
     return false;
   }
@@ -36,38 +49,58 @@ function isSquareCatalogVariationLike(
   const objectValue = value as {
     id?: unknown;
     type?: unknown;
-    itemVariationData?: unknown;
-    item_variation_data?: unknown;
+    itemData?: unknown;
+    item_data?: unknown;
   };
 
   if (typeof objectValue.id !== "string") {
     return false;
   }
 
-  if (objectValue.type !== "ITEM_VARIATION") {
+  if (objectValue.type !== "ITEM") {
     return false;
   }
 
-  const variationData =
-    objectValue.itemVariationData ?? objectValue.item_variation_data;
+  const itemData = objectValue.itemData ?? objectValue.item_data;
 
-  if (!variationData || typeof variationData !== "object") {
+  if (!itemData || typeof itemData !== "object") {
     return false;
   }
 
-  const variationDataValue = variationData as {
+  const itemDataValue = itemData as {
     name?: unknown;
+    variations?: unknown;
   };
 
-  return typeof variationDataValue.name === "string";
+  return typeof itemDataValue.name === "string";
 }
 
-function getVariationName(variation: SquareCatalogVariationLike): string {
-  return (
-    variation.itemVariationData?.name ??
-    variation.item_variation_data?.name ??
-    "Unnamed Variation"
-  );
+function getItemData(item: SquareCatalogItemLike) {
+  return item.itemData ?? item.item_data;
+}
+
+function getVariationData(variation: SquareCatalogVariationLike) {
+  return variation.itemVariationData ?? variation.item_variation_data;
+}
+
+function buildProductName(
+  itemName: string,
+  variationName: string | undefined,
+): string {
+  if (!variationName) {
+    return itemName;
+  }
+
+  const normalizedVariationName = variationName.trim().toLowerCase();
+
+  if (
+    normalizedVariationName === "regular" ||
+    normalizedVariationName === itemName.trim().toLowerCase()
+  ) {
+    return itemName;
+  }
+
+  return `${itemName} ${variationName}`;
 }
 
 function buildAliases(name: string): string[] {
@@ -76,7 +109,7 @@ function buildAliases(name: string): string[] {
   return Array.from(
     new Set([
       normalizedName,
-      normalizedName.replace(/\b(bottle|can|draft)\b/g, "").trim(),
+      normalizedName.replace(/\b(bottle|can|draft|regular)\b/g, "").trim(),
     ]),
   ).filter(Boolean);
 }
@@ -93,17 +126,46 @@ function getQuantityAsNumber(quantity: string | undefined): number {
 export async function GET() {
   try {
     const catalogResponse = await squareClient.catalog.search({
-      objectTypes: ["ITEM_VARIATION"],
+      objectTypes: ["ITEM"],
       includeDeletedObjects: false,
     });
 
     const catalogObjects = (catalogResponse.objects ?? []) as unknown[];
+    const items = catalogObjects.filter(isSquareCatalogItemLike);
 
-    const itemVariations = catalogObjects.filter(isSquareCatalogVariationLike);
+    const productDrafts: {
+      id: string;
+      name: string;
+      aliases: string[];
+    }[] = [];
 
-    const variationIds: string[] = itemVariations.map(
-      (variation) => variation.id,
-    );
+    for (const item of items) {
+      const itemData = getItemData(item);
+      const itemName = itemData?.name;
+
+      if (!itemName) {
+        continue;
+      }
+
+      const variations = itemData?.variations ?? [];
+
+      for (const variation of variations) {
+        if (!variation.id) {
+          continue;
+        }
+
+        const variationData = getVariationData(variation);
+        const productName = buildProductName(itemName, variationData?.name);
+
+        productDrafts.push({
+          id: variation.id,
+          name: productName,
+          aliases: buildAliases(productName),
+        });
+      }
+    }
+
+    const variationIds = productDrafts.map((product) => product.id);
 
     let countsByVariationId = new Map<string, number>();
 
@@ -135,16 +197,12 @@ export async function GET() {
       );
     }
 
-    const products: SpeakStockProduct[] = itemVariations.map((variation) => {
-      const name = getVariationName(variation);
-
-      return {
-        id: variation.id,
-        name,
-        aliases: buildAliases(name),
-        squareCount: countsByVariationId.get(variation.id) ?? 0,
-      };
-    });
+    const products: SpeakStockProduct[] = productDrafts.map((product) => ({
+      id: product.id,
+      name: product.name,
+      aliases: product.aliases,
+      squareCount: countsByVariationId.get(product.id) ?? 0,
+    }));
 
     return NextResponse.json({ products });
   } catch (error) {
