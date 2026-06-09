@@ -12,7 +12,6 @@ import {
   buildInventorySummary,
   getDiscrepancyRows,
 } from "@/lib/inventory/session";
-import { productAliasOverrides } from "@/lib/inventory/productAliasOverrides";
 
 type SpeechRecognitionResultLike = {
   transcript: string;
@@ -55,7 +54,6 @@ const INVENTORY_ENTRIES_STORAGE_KEY = "speakstock_inventory_entries";
 
 export default function InventoryPage() {
   const [command, setCommand] = useState("");
-  const [entries, setEntries] = useState<CountEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
@@ -64,10 +62,29 @@ export default function InventoryPage() {
   const [submissionPreview, setSubmissionPreview] = useState<
     InventorySubmissionPreview[] | null
   >(null);
-  const [hasLoadedEntries, setHasLoadedEntries] = useState(false);
   const [products, setProducts] = useState<InventoryProduct[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [productsError, setProductsError] = useState<string | null>(null);
+  const [entries, setEntries] = useState<CountEntry[]>(() => {
+    if (typeof window === "undefined") {
+      return [];
+    }
+
+    const savedEntries = window.localStorage.getItem(
+      INVENTORY_ENTRIES_STORAGE_KEY,
+    );
+
+    if (!savedEntries) {
+      return [];
+    }
+
+    try {
+      return JSON.parse(savedEntries) as CountEntry[];
+    } catch {
+      window.localStorage.removeItem(INVENTORY_ENTRIES_STORAGE_KEY);
+      return [];
+    }
+  });
 
   const summaryRows = useMemo(() => {
     return buildInventorySummary(products, entries);
@@ -78,32 +95,11 @@ export default function InventoryPage() {
   }, [summaryRows]);
 
   useEffect(() => {
-    const savedEntries = window.localStorage.getItem(
-      INVENTORY_ENTRIES_STORAGE_KEY,
-    );
-
-    if (savedEntries) {
-      try {
-        const parsedEntries = JSON.parse(savedEntries) as CountEntry[];
-        setEntries(parsedEntries);
-      } catch {
-        window.localStorage.removeItem(INVENTORY_ENTRIES_STORAGE_KEY);
-      }
-    }
-
-    setHasLoadedEntries(true);
-  }, []);
-
-  useEffect(() => {
-    if (!hasLoadedEntries) {
-      return;
-    }
-
     window.localStorage.setItem(
       INVENTORY_ENTRIES_STORAGE_KEY,
       JSON.stringify(entries),
     );
-  }, [entries, hasLoadedEntries]);
+  }, [entries]);
 
   useEffect(() => {
     async function loadProducts() {
