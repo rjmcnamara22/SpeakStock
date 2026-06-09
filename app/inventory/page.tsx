@@ -659,6 +659,45 @@ export default function InventoryPage() {
             </div>
           )}
         </section>
+
+        <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+          <h2 className="text-xl font-semibold">Loaded Square Products</h2>
+          <p className="mt-2 text-sm text-zinc-400">
+            Temporary debug view showing product names and aliases used for
+            matching.
+          </p>
+
+          {products.length === 0 ? (
+            <p className="mt-4 text-sm text-zinc-400">
+              No Square products loaded.
+            </p>
+          ) : (
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full border-collapse text-left text-sm">
+                <thead>
+                  <tr className="border-b border-zinc-800 text-zinc-400">
+                    <th className="py-3 pr-4">Product</th>
+                    <th className="py-3 pr-4">Aliases</th>
+                    <th className="py-3 pr-4 text-right">Square Count</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {products.map((product) => (
+                    <tr key={product.id} className="border-b border-zinc-800">
+                      <td className="py-3 pr-4 font-medium">{product.name}</td>
+                      <td className="py-3 pr-4 text-zinc-400">
+                        {product.aliases.join(", ")}
+                      </td>
+                      <td className="py-3 pr-4 text-right">
+                        {product.squareCount}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
       </div>
     </main>
   );
