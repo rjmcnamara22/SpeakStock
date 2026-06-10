@@ -391,7 +391,7 @@ export default function InventoryPage() {
   }
 
   return (
-    <main className="min-h-screen bg-zinc-950 px-6 py-8 text-zinc-100">
+    <main className="min-h-screen bg-zinc-950 px-3 py-4 text-zinc-100 sm:px-6 sm:py-8">
       <div className="mx-auto max-w-6xl space-y-8">
         <section>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -438,7 +438,7 @@ export default function InventoryPage() {
           )}
         </section>
 
-        <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+        <section className="sticky top-0 z-10 rounded-xl border border-zinc-800 bg-zinc-900/95 p-4 backdrop-blur sm:p-5">
           <label
             htmlFor="inventory-command"
             className="block text-sm font-medium text-zinc-300"
@@ -457,13 +457,13 @@ export default function InventoryPage() {
                 }
               }}
               placeholder="Miller Lite 48"
-              className="flex-1 rounded-lg border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100 outline-none focus:border-emerald-500"
+              className="min-h-12 flex-1 rounded-lg border border-zinc-700 bg-zinc-950 px-4 py-3 text-base text-zinc-100 outline-none focus:border-emerald-500"
             />
 
             <button
               onClick={handleStartVoiceInput}
               disabled={isListening}
-              className="rounded-lg border border-emerald-700 px-5 py-3 font-semibold text-emerald-300 hover:bg-emerald-950 disabled:cursor-not-allowed disabled:opacity-50"
+              className="min-h-12 rounded-lg border border-emerald-700 px-5 py-3 text-base font-semibold text-emerald-300 hover:bg-emerald-950 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isListening ? "Listening..." : "Use Voice"}
             </button>
@@ -471,7 +471,7 @@ export default function InventoryPage() {
             <button
               onClick={handleAddEntry}
               disabled={isLoadingProducts || products.length === 0}
-              className="rounded-lg bg-emerald-500 px-5 py-3 font-semibold text-zinc-950 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400"
+              className="min-h-12 rounded-lg bg-emerald-500 px-5 py-3 text-base font-semibold text-zinc-950 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400"
             >
               Add Count
             </button>
@@ -479,7 +479,7 @@ export default function InventoryPage() {
             <button
               onClick={handleUndoLastEntry}
               disabled={entries.length === 0}
-              className="rounded-lg border border-zinc-700 px-5 py-3 font-semibold text-zinc-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
+              className="min-h-12 rounded-lg border border-zinc-700 px-5 py-3 text-base font-semibold text-zinc-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Undo Last
             </button>
@@ -516,7 +516,47 @@ export default function InventoryPage() {
             </button>
           </div>
 
-          <div className="mt-4 overflow-x-auto">
+          <div className="mt-4 space-y-3 sm:hidden">
+            {summaryRows.map((row) => (
+              <article
+                key={row.productId}
+                className="rounded-lg border border-zinc-800 bg-zinc-950 p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-semibold text-zinc-100">
+                      {row.productName}
+                    </h3>
+                    <p className="mt-1 text-sm text-zinc-400">
+                      Square: {row.squareCount} · Counted: {row.localCount}
+                    </p>
+                  </div>
+
+                  <p
+                    className={`text-lg font-bold ${
+                      row.difference === 0
+                        ? "text-zinc-400"
+                        : row.difference > 0
+                          ? "text-emerald-400"
+                          : "text-red-400"
+                    }`}
+                  >
+                    {row.difference > 0 ? `+${row.difference}` : row.difference}
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => handleResetProduct(row.productId)}
+                  disabled={row.localCount === 0}
+                  className="mt-3 w-full rounded-md border border-zinc-700 px-3 py-2 text-sm font-semibold text-zinc-300 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Reset Count
+                </button>
+              </article>
+            ))}
+          </div>
+
+          <div className="mt-4 hidden overflow-x-auto sm:block">
             <table className="w-full border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-zinc-800 text-zinc-400">
