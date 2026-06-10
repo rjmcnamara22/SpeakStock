@@ -215,14 +215,28 @@ export default function InventoryPage() {
     setIsReviewConfirmed(false);
   }
 
-  function getDifferenceLabel(difference: number): string {
-    if (difference < 0) return "Lost";
-    if (difference > 0) return "Received";
+  function getAdjustmentActionText(difference: number): string {
+    if (difference < 0) {
+      return `Apply ${difference} as Loss`;
+    }
+
+    if (difference > 0) {
+      return `Apply +${difference} as Inventory Received`;
+    }
+
     return "No correction";
   }
 
-  function getSubmissionLabel(difference: number): "Lost" | "Received" {
-    return difference < 0 ? "Lost" : "Received";
+  function getDifferenceLabel(difference: number): string {
+    if (difference < 0) return "Loss";
+    if (difference > 0) return "Inventory Received";
+    return "No correction";
+  }
+
+  function getSubmissionLabel(
+    difference: number,
+  ): "Loss" | "Inventory Received" {
+    return difference < 0 ? "Loss" : "Inventory Received";
   }
 
   function buildSubmissionPreview(): InventorySubmissionPreview[] {
@@ -292,7 +306,9 @@ export default function InventoryPage() {
           items: preview.map((item) => ({
             productId: item.productId,
             productName: item.productName,
+            squareCount: item.squareCount,
             physicalCount: item.physicalCount,
+            difference: item.difference,
           })),
         }),
       });
@@ -620,7 +636,7 @@ export default function InventoryPage() {
                     <th className="py-3 pr-4 text-right">Physical Count</th>
                     <th className="py-3 pr-4 text-right">Difference</th>
                     <th className="py-3 pr-4 text-right">Label</th>
-                    <th className="py-3 pr-4 text-right">Future Action</th>
+                    <th className="py-3 pr-4 text-right">Square Adjustment</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -653,7 +669,7 @@ export default function InventoryPage() {
                       </td>
 
                       <td className="py-3 pr-4 text-right text-zinc-300">
-                        Set Square to {row.localCount}
+                        {getAdjustmentActionText(row.difference)}
                       </td>
                     </tr>
                   ))}
@@ -677,39 +693,42 @@ export default function InventoryPage() {
               </span>
             </label>
 
-            <button
-              onClick={handlePreviewSubmission}
-              disabled={discrepancyRows.length === 0 || !isReviewConfirmed}
-              className="rounded-lg bg-emerald-500 px-5 py-3 font-semibold text-zinc-950 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400"
-            >
-              Preview Future Square Sync
-            </button>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <button
+                onClick={handlePreviewSubmission}
+                disabled={discrepancyRows.length === 0 || !isReviewConfirmed}
+                className="w-full rounded-lg bg-emerald-500 px-5 py-3 font-semibold text-zinc-950 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400 sm:w-auto"
+              >
+                Preview Future Square Sync
+              </button>
 
-            <button
-              onClick={handleSubmitToSquare}
-              disabled={
-                discrepancyRows.length === 0 ||
-                !isReviewConfirmed ||
-                isSubmittingToSquare
-              }
-              className="ml-0 rounded-lg bg-red-500 px-5 py-3 font-semibold text-white hover:bg-red-400 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400 sm:ml-3"
-            >
-              {isSubmittingToSquare
-                ? "Submitting..."
-                : "Submit to Square Sandbox"}
-            </button>
+              <button
+                onClick={handleSubmitToSquare}
+                disabled={
+                  discrepancyRows.length === 0 ||
+                  !isReviewConfirmed ||
+                  isSubmittingToSquare
+                }
+                className="w-full rounded-lg bg-red-500 px-5 py-3 font-semibold text-white hover:bg-red-400 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400 sm:w-auto"
+              >
+                {isSubmittingToSquare
+                  ? "Submitting..."
+                  : "Submit to Square Sandbox"}
+              </button>
+            </div>
           </div>
         </section>
 
         {submissionPreview && (
           <section className="rounded-xl border border-emerald-900 bg-emerald-950/30 p-5">
             <h2 className="text-xl font-semibold text-emerald-200">
-              Square Submission Preview
+              Square Adjustment Preview
             </h2>
 
             <p className="mt-2 text-sm text-emerald-100/80">
-              These are the physical counts prepared for Square. If submitted,
-              Square will be updated to match the physical counts shown here.
+              These are the inventory differences prepared for Square. Positive
+              differences will be submitted as Inventory Received, and negative
+              differences will be submitted as Loss.
             </p>
 
             <div className="mt-4 overflow-x-auto">
@@ -720,7 +739,7 @@ export default function InventoryPage() {
                     <th className="py-3 pr-4 text-right">Square Count</th>
                     <th className="py-3 pr-4 text-right">Physical Count</th>
                     <th className="py-3 pr-4 text-right">Difference</th>
-                    <th className="py-3 pr-4 text-right">Label</th>
+                    <th className="py-3 pr-4 text-right">Adjustment Type</th>
                   </tr>
                 </thead>
                 <tbody>

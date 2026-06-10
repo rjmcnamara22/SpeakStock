@@ -47,5 +47,5 @@ export type InventorySubmissionPreview = {
   squareCount: number;
   physicalCount: number;
   difference: number;
-  label: "Lost" | "Received";
+  label: "Loss" | "Inventory Received";
 };

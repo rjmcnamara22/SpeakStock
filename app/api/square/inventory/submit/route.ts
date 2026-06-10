@@ -5,7 +5,9 @@ import { squareClient } from "@/lib/square/client";
 type InventorySubmissionItem = {
   productId: string;
   productName: string;
+  squareCount: number;
   physicalCount: number;
+  difference: number;
 };
 
 type InventorySubmitRequest = {
@@ -22,16 +24,65 @@ function isInventorySubmissionItem(
   const item = value as {
     productId?: unknown;
     productName?: unknown;
+    squareCount?: unknown;
     physicalCount?: unknown;
+    difference?: unknown;
   };
 
   return (
     typeof item.productId === "string" &&
     typeof item.productName === "string" &&
+    typeof item.squareCount === "number" &&
     typeof item.physicalCount === "number" &&
+    typeof item.difference === "number" &&
+    Number.isInteger(item.squareCount) &&
     Number.isInteger(item.physicalCount) &&
+    Number.isInteger(item.difference) &&
+    item.squareCount >= 0 &&
     item.physicalCount >= 0
   );
+}
+
+function getAdjustmentReason(
+  difference: number,
+): "Loss" | "Inventory Received" {
+  return difference < 0 ? "Loss" : "Inventory Received";
+}
+
+function buildInventoryAdjustmentChange(
+  item: InventorySubmissionItem,
+  locationId: string,
+  occurredAt: string,
+) {
+  const adjustmentQuantity = Math.abs(item.difference);
+
+  if (item.difference > 0) {
+    return {
+      type: "ADJUSTMENT" as const,
+      adjustment: {
+        referenceId: `speakstock-${randomUUID()}`,
+        catalogObjectId: item.productId,
+        locationId,
+        fromState: "NONE" as const,
+        toState: "IN_STOCK" as const,
+        quantity: adjustmentQuantity.toString(),
+        occurredAt,
+      },
+    };
+  }
+
+  return {
+    type: "ADJUSTMENT" as const,
+    adjustment: {
+      referenceId: `speakstock-${randomUUID()}`,
+      catalogObjectId: item.productId,
+      locationId,
+      fromState: "IN_STOCK" as const,
+      toState: "WASTE" as const,
+      quantity: adjustmentQuantity.toString(),
+      occurredAt,
+    },
+  };
 }
 
 export async function POST(request: Request) {
@@ -56,25 +107,20 @@ export async function POST(request: Request) {
 
     const validItems = body.items.filter(isInventorySubmissionItem);
 
-    if (validItems.length === 0) {
+    const adjustmentItems = validItems.filter((item) => item.difference !== 0);
+
+    if (adjustmentItems.length === 0) {
       return NextResponse.json(
-        { error: "No valid inventory items were submitted." },
+        { error: "No inventory differences were submitted." },
         { status: 400 },
       );
     }
 
     const occurredAt = new Date().toISOString();
 
-    const changes = validItems.map((item) => ({
-      type: "PHYSICAL_COUNT" as const,
-      physicalCount: {
-        catalogObjectId: item.productId,
-        locationId,
-        state: "IN_STOCK" as const,
-        quantity: item.physicalCount.toString(),
-        occurredAt,
-      },
-    }));
+    const changes = adjustmentItems.map((item) =>
+      buildInventoryAdjustmentChange(item, locationId, occurredAt),
+    );
 
     const response = await squareClient.inventory.batchCreateChanges({
       idempotencyKey: randomUUID(),
@@ -84,14 +130,30 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      submittedCount: validItems.length,
+      submittedCount: adjustmentItems.length,
+      submittedItems: adjustmentItems.map((item) => ({
+        productId: item.productId,
+        productName: item.productName,
+        squareCount: item.squareCount,
+        physicalCount: item.physicalCount,
+        difference: item.difference,
+        reason: getAdjustmentReason(item.difference),
+        adjustmentQuantity: Math.abs(item.difference),
+      })),
       result: response,
     });
   } catch (error) {
     console.error("Square inventory submit error:", error);
 
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown Square submit error.";
+
     return NextResponse.json(
-      { error: "Failed to submit inventory counts to Square." },
+      {
+        error: "Failed to submit inventory adjustments to Square.",
+        details:
+          process.env.NODE_ENV === "development" ? errorMessage : undefined,
+      },
       { status: 500 },
     );
   }
