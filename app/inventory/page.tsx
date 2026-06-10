@@ -43,6 +43,29 @@ type SpeechRecognitionLike = {
 
 type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
 
+type SquareInventoryHistoryItem = {
+  id?: string;
+  type: "PHYSICAL_COUNT" | "ADJUSTMENT" | "UNKNOWN";
+  catalogObjectId?: string;
+  locationId?: string;
+  quantity?: string;
+  fromState?: string;
+  toState?: string;
+  occurredAt?: string;
+  calculatedAt?: string;
+  referenceId?: string;
+  source?: string;
+  label: "Loss" | "Inventory Received" | "Physical Count" | "Other";
+};
+
+type SquareInventoryHistoryResponse = {
+  success?: boolean;
+  count?: number;
+  changes?: SquareInventoryHistoryItem[];
+  error?: string;
+  details?: string;
+};
+
 declare global {
   interface Window {
     SpeechRecognition?: SpeechRecognitionConstructor;
@@ -68,6 +91,11 @@ export default function InventoryPage() {
   const [productsError, setProductsError] = useState<string | null>(null);
   const [entries, setEntries] = useState<CountEntry[]>([]);
   const [hasLoadedEntries, setHasLoadedEntries] = useState(false);
+  const [historyItems, setHistoryItems] = useState<
+    SquareInventoryHistoryItem[]
+  >([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
   const summaryRows = useMemo(() => {
     return buildInventorySummary(products, entries);
@@ -104,6 +132,37 @@ export default function InventoryPage() {
     }
   }
 
+  async function loadInventoryHistory() {
+    try {
+      setHistoryError(null);
+      setIsLoadingHistory(true);
+
+      const response = await fetch(
+        "/api/square/inventory/history?days=30&limit=25",
+      );
+
+      const data = (await response.json()) as SquareInventoryHistoryResponse;
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.details ?? data.error ?? "Failed to load inventory history.",
+        );
+      }
+
+      setHistoryItems(data.changes ?? []);
+    } catch (caughtError) {
+      if (caughtError instanceof Error) {
+        setHistoryError(caughtError.message);
+      } else {
+        setHistoryError(
+          "Something went wrong while loading inventory history.",
+        );
+      }
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  }
+
   useEffect(() => {
     if (!hasLoadedEntries) {
       return;
@@ -118,6 +177,7 @@ export default function InventoryPage() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadProducts();
+    void loadInventoryHistory();
   }, []);
 
   useEffect(() => {
@@ -138,6 +198,43 @@ export default function InventoryPage() {
 
     setHasLoadedEntries(true);
   }, []);
+
+  function formatHistoryDate(value?: string): string {
+    if (!value) {
+      return "Unknown time";
+    }
+
+    return new Intl.DateTimeFormat("en-US", {
+      dateStyle: "short",
+      timeStyle: "short",
+    }).format(new Date(value));
+  }
+
+  function getHistoryItemTitle(item: SquareInventoryHistoryItem): string {
+    if (item.label === "Inventory Received") {
+      return "Inventory Received";
+    }
+
+    if (item.label === "Loss") {
+      return "Loss";
+    }
+
+    if (item.label === "Physical Count") {
+      return "Physical Count";
+    }
+
+    return "Inventory Change";
+  }
+
+  function getProductNameForHistoryItem(
+    item: SquareInventoryHistoryItem,
+  ): string {
+    const product = products.find(
+      (candidate) => candidate.id === item.catalogObjectId,
+    );
+
+    return product?.name ?? item.catalogObjectId ?? "Unknown product";
+  }
 
   function handleAddEntry() {
     try {
@@ -338,6 +435,7 @@ export default function InventoryPage() {
       window.localStorage.removeItem(INVENTORY_ENTRIES_STORAGE_KEY);
 
       await loadProducts();
+      await loadInventoryHistory();
     } catch (caughtError) {
       if (caughtError instanceof Error) {
         setError(caughtError.message);
@@ -780,6 +878,102 @@ export default function InventoryPage() {
             </pre>
           </section>
         )}
+
+        <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 sm:p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">
+                Recent Square Inventory Changes
+              </h2>
+              <p className="mt-1 text-sm text-zinc-400">
+                Recent inventory adjustments retrieved from Square for this
+                location.
+              </p>
+            </div>
+
+            <button
+              onClick={loadInventoryHistory}
+              disabled={isLoadingHistory}
+              className="min-h-11 rounded-lg border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-300 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isLoadingHistory ? "Refreshing..." : "Refresh History"}
+            </button>
+          </div>
+
+          {historyError && (
+            <p className="mt-4 rounded-lg border border-red-900 bg-red-950 px-4 py-3 text-sm text-red-200">
+              {historyError}
+            </p>
+          )}
+
+          {!historyError && historyItems.length === 0 && (
+            <p className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm text-zinc-400">
+              {isLoadingHistory
+                ? "Loading recent inventory changes..."
+                : "No recent Square inventory changes found."}
+            </p>
+          )}
+
+          {historyItems.length > 0 && (
+            <div className="mt-4 space-y-3">
+              {historyItems.map((item, index) => (
+                <article
+                  key={
+                    item.id ??
+                    item.referenceId ??
+                    `${item.catalogObjectId}-${index}`
+                  }
+                  className="rounded-lg border border-zinc-800 bg-zinc-950 p-4"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p
+                        className={`text-sm font-semibold ${
+                          item.label === "Inventory Received"
+                            ? "text-emerald-400"
+                            : item.label === "Loss"
+                              ? "text-red-400"
+                              : "text-zinc-300"
+                        }`}
+                      >
+                        {getHistoryItemTitle(item)}
+                      </p>
+
+                      <h3 className="mt-1 font-semibold text-zinc-100">
+                        {getProductNameForHistoryItem(item)}
+                      </h3>
+
+                      <p className="mt-1 text-sm text-zinc-400">
+                        {item.type === "ADJUSTMENT"
+                          ? `${item.fromState ?? "Unknown"} → ${
+                              item.toState ?? "Unknown"
+                            }`
+                          : item.type}
+                      </p>
+                    </div>
+
+                    <div className="text-left sm:text-right">
+                      <p className="text-lg font-bold text-zinc-100">
+                        Qty {item.quantity ?? "?"}
+                      </p>
+                      <p className="mt-1 text-sm text-zinc-400">
+                        {formatHistoryDate(
+                          item.occurredAt ?? item.calculatedAt,
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  {item.referenceId && (
+                    <p className="mt-3 break-all text-xs text-zinc-500">
+                      Reference: {item.referenceId}
+                    </p>
+                  )}
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
 
         <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
           <h2 className="text-xl font-semibold">Entry Log</h2>
