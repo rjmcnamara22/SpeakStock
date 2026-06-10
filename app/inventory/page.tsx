@@ -382,14 +382,35 @@ export default function InventoryPage() {
     recognition.start();
   }
 
+  async function handleLogout() {
+    await fetch("/api/auth/logout", {
+      method: "POST",
+    });
+
+    window.location.href = "/login";
+  }
+
   return (
     <main className="min-h-screen bg-zinc-950 px-6 py-8 text-zinc-100">
       <div className="mx-auto max-w-6xl space-y-8">
         <section>
-          <p className="text-sm font-semibold uppercase tracking-wide text-emerald-400">
-            SpeakStock MVP
-          </p>
-          <h1 className="mt-2 text-3xl font-bold">Inventory Count Session</h1>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wide text-emerald-400">
+                SpeakStock MVP
+              </p>
+              <h1 className="mt-2 text-3xl font-bold">
+                Inventory Count Session
+              </h1>
+            </div>
+
+            <button
+              onClick={handleLogout}
+              className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-300 hover:bg-zinc-800"
+            >
+              Log out
+            </button>
+          </div>
           <p className="mt-2 max-w-2xl text-zinc-400">
             Type a count like{" "}
             <span className="font-semibold text-zinc-200">Miller Lite 48</span>.
