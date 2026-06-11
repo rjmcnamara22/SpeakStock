@@ -73,6 +73,12 @@ type SquareInventoryHistoryResponse = {
   details?: string;
 };
 
+type SubmittedSessionSummary = {
+  submittedAt: string;
+  submittedCount: number;
+  items: InventorySubmissionPreview[];
+};
+
 declare global {
   interface Window {
     SpeechRecognition?: SpeechRecognitionConstructor;
@@ -135,6 +141,8 @@ export default function InventoryPage() {
   >([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [submittedSessionSummary, setSubmittedSessionSummary] =
+    useState<SubmittedSessionSummary | null>(null);
 
   const summaryRows = useMemo(() => {
     return buildInventorySummary(products, entries);
@@ -249,6 +257,13 @@ export default function InventoryPage() {
     }).format(new Date(value));
   }
 
+  function formatSubmittedSessionDate(value: string): string {
+    return new Intl.DateTimeFormat("en-US", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(value));
+  }
+
   function getHistoryItemTitle(item: SquareInventoryHistoryItem): string {
     if (item.label === "Inventory Received") {
       return "Inventory Received";
@@ -282,6 +297,7 @@ export default function InventoryPage() {
       setSuccessMessage(null);
       setSubmissionPreview(null);
       setIsReviewConfirmed(false);
+      setSubmittedSessionSummary(null);
 
       if (products.length === 0) {
         setError(
@@ -462,10 +478,19 @@ export default function InventoryPage() {
         );
       }
 
+      const submittedCount = data.submittedCount ?? preview.length;
+
       setSubmissionPreview(preview);
+
+      setSubmittedSessionSummary({
+        submittedAt: new Date().toISOString(),
+        submittedCount,
+        items: preview,
+      });
+
       setSuccessMessage(
-        `Submitted ${data.submittedCount ?? preview.length} correction${
-          (data.submittedCount ?? preview.length) === 1 ? "" : "s"
+        `Submitted ${submittedCount} adjustment${
+          submittedCount === 1 ? "" : "s"
         } to Square Sandbox.`,
       );
 
@@ -757,6 +782,80 @@ export default function InventoryPage() {
             </table>
           </div>
         </CollapsibleSection>
+
+        {submittedSessionSummary && (
+          <section className="rounded-xl border border-emerald-900 bg-emerald-950/30 p-4 sm:p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-wide text-emerald-400">
+                  Session Submitted
+                </p>
+                <h2 className="mt-1 text-xl font-semibold text-zinc-100">
+                  {submittedSessionSummary.submittedCount} Square adjustment
+                  {submittedSessionSummary.submittedCount === 1 ? "" : "s"}{" "}
+                  submitted
+                </h2>
+                <p className="mt-1 text-sm text-zinc-400">
+                  Submitted at{" "}
+                  {formatSubmittedSessionDate(
+                    submittedSessionSummary.submittedAt,
+                  )}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSubmittedSessionSummary(null)}
+                className="rounded-lg border border-emerald-800 px-4 py-2 text-sm font-semibold text-emerald-200 hover:bg-emerald-900"
+              >
+                Dismiss
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {submittedSessionSummary.items.map((item) => (
+                <article
+                  key={item.productId}
+                  className="rounded-lg border border-emerald-900/70 bg-zinc-950 p-4"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <h3 className="font-semibold text-zinc-100">
+                        {item.productName}
+                      </h3>
+
+                      <p
+                        className={`mt-1 text-sm font-semibold ${
+                          item.difference > 0
+                            ? "text-emerald-400"
+                            : "text-red-400"
+                        }`}
+                      >
+                        {item.label}
+                      </p>
+
+                      <p className="mt-1 text-sm text-zinc-400">
+                        Square before: {item.squareCount} · Counted:{" "}
+                        {item.physicalCount}
+                      </p>
+                    </div>
+
+                    <div className="text-left sm:text-right">
+                      <p className="text-lg font-bold text-zinc-100">
+                        {item.difference > 0
+                          ? `+${item.difference}`
+                          : item.difference}
+                      </p>
+                      <p className="mt-1 text-sm text-zinc-400">
+                        Adjustment quantity: {Math.abs(item.difference)}
+                      </p>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
 
         <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
           <h2 className="text-xl font-semibold">Differences to Review</h2>
