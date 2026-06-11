@@ -13,6 +13,13 @@ import {
   getDiscrepancyRows,
 } from "@/lib/inventory/session";
 
+type CollapsibleSectionProps = {
+  title: string;
+  description?: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+};
+
 type SpeechRecognitionResultLike = {
   transcript: string;
 };
@@ -74,6 +81,38 @@ declare global {
 }
 
 const INVENTORY_ENTRIES_STORAGE_KEY = "speakstock_inventory_entries";
+
+function CollapsibleSection({
+  title,
+  description,
+  defaultOpen = false,
+  children,
+}: CollapsibleSectionProps) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 sm:p-5">
+      <button
+        type="button"
+        onClick={() => setIsOpen((current) => !current)}
+        className="flex w-full items-start justify-between gap-4 text-left"
+      >
+        <div>
+          <h2 className="text-xl font-semibold">{title}</h2>
+          {description && (
+            <p className="mt-1 text-sm text-zinc-400">{description}</p>
+          )}
+        </div>
+
+        <span className="rounded-md border border-zinc-700 px-2 py-1 text-sm text-zinc-300">
+          {isOpen ? "Hide" : "Show"}
+        </span>
+      </button>
+
+      {isOpen && <div className="mt-4">{children}</div>}
+    </section>
+  );
+}
 
 export default function InventoryPage() {
   const [command, setCommand] = useState("");
@@ -618,9 +657,12 @@ export default function InventoryPage() {
           )}
         </section>
 
-        <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+        <CollapsibleSection
+          title="Running Count Summary"
+          description="Current local count compared with Square inventory."
+          defaultOpen
+        >
           <div className="flex items-center justify-between gap-4">
-            <h2 className="text-xl font-semibold">Running Count Summary</h2>
             <button
               onClick={handleClearSession}
               disabled={entries.length === 0}
@@ -714,7 +756,7 @@ export default function InventoryPage() {
               </tbody>
             </table>
           </div>
-        </section>
+        </CollapsibleSection>
 
         <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
           <h2 className="text-xl font-semibold">Differences to Review</h2>
@@ -818,11 +860,10 @@ export default function InventoryPage() {
         </section>
 
         {submissionPreview && (
-          <section className="rounded-xl border border-emerald-900 bg-emerald-950/30 p-5">
-            <h2 className="text-xl font-semibold text-emerald-200">
-              Square Adjustment Preview
-            </h2>
-
+          <CollapsibleSection
+            title="Square Adjustment Preview"
+            description="Preview of the adjustments prepared for Square."
+          >
             <p className="mt-2 text-sm text-emerald-100/80">
               These are the inventory differences prepared for Square. Positive
               differences will be submitted as Inventory Received, and negative
@@ -876,18 +917,17 @@ export default function InventoryPage() {
             <pre className="mt-4 overflow-x-auto rounded-lg border border-emerald-900 bg-zinc-950 p-4 text-xs text-emerald-100">
               {JSON.stringify(submissionPreview, null, 2)}
             </pre>
-          </section>
+          </CollapsibleSection>
         )}
 
-        <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 sm:p-5">
+        <CollapsibleSection
+          title="Recent Square Inventory Changes"
+          description="Recent inventory adjustments retrieved from Square for this location."
+        >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-xl font-semibold">
-                Recent Square Inventory Changes
-              </h2>
-              <p className="mt-1 text-sm text-zinc-400">
-                Recent inventory adjustments retrieved from Square for this
-                location.
+              <p className="text-sm text-zinc-400">
+                Refresh this list after submitting inventory adjustments.
               </p>
             </div>
 
@@ -973,11 +1013,12 @@ export default function InventoryPage() {
               ))}
             </div>
           )}
-        </section>
+        </CollapsibleSection>
 
-        <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-          <h2 className="text-xl font-semibold">Entry Log</h2>
-
+        <CollapsibleSection
+          title="Entry Log"
+          description="Every typed or voice count added during this session."
+        >
           {entries.length === 0 ? (
             <p className="mt-4 text-sm text-zinc-400">
               No count entries added yet.
@@ -1021,10 +1062,12 @@ export default function InventoryPage() {
               </table>
             </div>
           )}
-        </section>
+        </CollapsibleSection>
 
-        <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-          <h2 className="text-xl font-semibold">Loaded Square Products</h2>
+        <CollapsibleSection
+          title="Loaded Square Products"
+          description="Debug view of products loaded from Square."
+        >
           <p className="mt-2 text-sm text-zinc-400">
             Temporary debug view showing product names and aliases used for
             matching.
@@ -1060,7 +1103,7 @@ export default function InventoryPage() {
               </table>
             </div>
           )}
-        </section>
+        </CollapsibleSection>
       </div>
     </main>
   );
