@@ -12,24 +12,48 @@ type SpeakStockProduct = {
 type SquareCatalogItemLike = {
   id: string;
   type?: string;
+  isDeleted?: boolean;
+  is_deleted?: boolean;
+  presentAtAllLocations?: boolean;
+  present_at_all_locations?: boolean;
+  absentAtLocationIds?: string[];
+  absent_at_location_ids?: string[];
   itemData?: {
     name?: string;
     variations?: SquareCatalogVariationLike[];
+    isArchived?: boolean;
+    is_archived?: boolean;
   };
   item_data?: {
     name?: string;
     variations?: SquareCatalogVariationLike[];
+    isArchived?: boolean;
+    is_archived?: boolean;
   };
 };
 
 type SquareCatalogVariationLike = {
   id?: string;
   type?: string;
+  isDeleted?: boolean;
+  is_deleted?: boolean;
+  presentAtAllLocations?: boolean;
+  present_at_all_locations?: boolean;
+  absentAtLocationIds?: string[];
+  absent_at_location_ids?: string[];
   itemVariationData?: {
     name?: string;
+    trackInventory?: boolean;
+    track_inventory?: boolean;
+    sellable?: boolean;
+    stockable?: boolean;
   };
   item_variation_data?: {
     name?: string;
+    trackInventory?: boolean;
+    track_inventory?: boolean;
+    sellable?: boolean;
+    stockable?: boolean;
   };
 };
 
@@ -82,6 +106,38 @@ function getItemData(item: SquareCatalogItemLike) {
 
 function getVariationData(variation: SquareCatalogVariationLike) {
   return variation.itemVariationData ?? variation.item_variation_data;
+}
+
+function isDeletedCatalogObject(object: {
+  isDeleted?: boolean;
+  is_deleted?: boolean;
+}): boolean {
+  return object.isDeleted === true || object.is_deleted === true;
+}
+
+function isArchivedItem(
+  itemData:
+    | {
+        isArchived?: boolean;
+        is_archived?: boolean;
+      }
+    | undefined,
+): boolean {
+  return itemData?.isArchived === true || itemData?.is_archived === true;
+}
+
+function isVariationStockTracked(
+  variationData:
+    | {
+        trackInventory?: boolean;
+        track_inventory?: boolean;
+      }
+    | undefined,
+): boolean {
+  return (
+    variationData?.trackInventory === true ||
+    variationData?.track_inventory === true
+  );
 }
 
 function buildProductName(
@@ -168,7 +224,16 @@ export async function GET() {
     }[] = [];
 
     for (const item of items) {
+      if (isDeletedCatalogObject(item)) {
+        continue;
+      }
+
       const itemData = getItemData(item);
+
+      if (isArchivedItem(itemData)) {
+        continue;
+      }
+
       const itemName = itemData?.name;
 
       if (!itemName) {
@@ -182,7 +247,16 @@ export async function GET() {
           continue;
         }
 
+        if (isDeletedCatalogObject(variation)) {
+          continue;
+        }
+
         const variationData = getVariationData(variation);
+
+        if (!isVariationStockTracked(variationData)) {
+          continue;
+        }
+
         const productName = buildProductName(itemName, variationData?.name);
 
         productDrafts.push({
