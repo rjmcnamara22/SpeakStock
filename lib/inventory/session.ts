@@ -6,25 +6,34 @@ import type {
 
 export function buildInventorySummary(
   products: InventoryProduct[],
-  entries: CountEntry[]
+  entries: CountEntry[],
 ): InventorySummaryRow[] {
-  return products.map((product) => {
-    const localCount = entries
-      .filter((entry) => entry.productId === product.id)
-      .reduce((sum, entry) => sum + entry.quantity, 0);
+  const localCounts = new Map<string, number>();
 
-    return {
-      productId: product.id,
-      productName: product.name,
-      squareCount: product.squareCount,
-      localCount,
-      difference: localCount - product.squareCount,
-    };
-  });
+  for (const entry of entries) {
+    const currentCount = localCounts.get(entry.productId) ?? 0;
+    localCounts.set(entry.productId, currentCount + entry.quantity);
+  }
+
+  const countedProductIds = new Set(entries.map((entry) => entry.productId));
+
+  return products
+    .filter((product) => countedProductIds.has(product.id))
+    .map((product) => {
+      const localCount = localCounts.get(product.id) ?? 0;
+
+      return {
+        productId: product.id,
+        productName: product.name,
+        squareCount: product.squareCount,
+        localCount,
+        difference: localCount - product.squareCount,
+      };
+    });
 }
 
 export function getDiscrepancyRows(
-  summaryRows: InventorySummaryRow[]
+  summaryRows: InventorySummaryRow[],
 ): InventorySummaryRow[] {
   return summaryRows.filter((row) => row.difference !== 0);
 }
