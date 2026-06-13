@@ -13,7 +13,7 @@ type HistoryItem = {
   calculatedAt?: string;
   referenceId?: string;
   source?: string;
-  label: "Loss" | "Inventory Received" | "Physical Count" | "Other";
+  label: "Lost" | "Inventory Received" | "Physical Count" | "Other";
 };
 
 function getLabelForAdjustment(fromState?: string, toState?: string) {
@@ -21,8 +21,8 @@ function getLabelForAdjustment(fromState?: string, toState?: string) {
     return "Inventory Received" as const;
   }
 
-  if (fromState === "IN_STOCK" && toState === "WASTE") {
-    return "Loss" as const;
+  if (fromState === "IN_STOCK" && toState === "NONE") {
+    return "Lost" as const;
   }
 
   return "Other" as const;

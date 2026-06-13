@@ -369,7 +369,7 @@ export default function InventoryPage() {
 
   function getAdjustmentActionText(difference: number): string {
     if (difference < 0) {
-      return `Apply ${difference} as Loss`;
+      return `Apply ${difference} as Lost`;
     }
 
     if (difference > 0) {
@@ -380,15 +380,15 @@ export default function InventoryPage() {
   }
 
   function getDifferenceLabel(difference: number): string {
-    if (difference < 0) return "Loss";
+    if (difference < 0) return "Lost";
     if (difference > 0) return "Inventory Received";
     return "No correction";
   }
 
   function getSubmissionLabel(
     difference: number,
-  ): "Loss" | "Inventory Received" {
-    return difference < 0 ? "Loss" : "Inventory Received";
+  ): "Lost" | "Inventory Received" {
+    return difference < 0 ? "Lost" : "Inventory Received";
   }
 
   function buildSubmissionPreview(): InventorySubmissionPreview[] {

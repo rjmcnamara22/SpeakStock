@@ -45,8 +45,8 @@ function isInventorySubmissionItem(
 
 function getAdjustmentReason(
   difference: number,
-): "Loss" | "Inventory Received" {
-  return difference < 0 ? "Loss" : "Inventory Received";
+): "Lost" | "Inventory Received" {
+  return difference < 0 ? "Lost" : "Inventory Received";
 }
 
 function buildInventoryAdjustmentChange(
@@ -78,7 +78,7 @@ function buildInventoryAdjustmentChange(
       catalogObjectId: item.productId,
       locationId,
       fromState: "IN_STOCK" as const,
-      toState: "WASTE" as const,
+      toState: "NONE" as const,
       quantity: adjustmentQuantity.toString(),
       occurredAt,
     },
