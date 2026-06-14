@@ -3,11 +3,23 @@ export const productAliasOverrides: Record<string, string[]> = {
 
   budweiser: ["budweiser", "bud", "bud weiser"],
 
+  "carlsberg can": ["carlsberg", "carls berg", "carlsburg"],
+
+  "cider boys": ["cider boys", "ciderboys", "cider boys cider"],
+
   "coors light": ["coors", "coors lite", "coorslight"],
 
   "dos equis": ["dos equis", "dos", "equis"],
 
+  "fh can bumbleberry": [
+    "bumbleberry",
+    "bumble berry",
+    "fat heads bumbleberry",
+  ],
+
   "fh head hunter can": ["headhunter", "head hunter", "fat heads head hunter"],
+
+  heineken: ["heineken", "heineken beer"],
 
   "high life bottle": [
     "miller high life",
