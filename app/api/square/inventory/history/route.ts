@@ -21,7 +21,7 @@ function getLabelForAdjustment(fromState?: string, toState?: string) {
     return "Inventory Received" as const;
   }
 
-  if (fromState === "IN_STOCK" && toState === "NONE") {
+  if (fromState === "IN_STOCK" && toState === "WASTE") {
     return "Lost" as const;
   }
 

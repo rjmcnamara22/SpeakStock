@@ -78,7 +78,7 @@ function buildInventoryAdjustmentChange(
       catalogObjectId: item.productId,
       locationId,
       fromState: "IN_STOCK" as const,
-      toState: "NONE" as const,
+      toState: "WASTE" as const,
       quantity: adjustmentQuantity.toString(),
       occurredAt,
     },
