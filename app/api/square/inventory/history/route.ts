@@ -3,7 +3,7 @@ import { squareClient } from "@/lib/square/client";
 
 type HistoryItem = {
   id?: string;
-  type: "PHYSICAL_COUNT" | "ADJUSTMENT" | "UNKNOWN";
+  type: "ADJUSTMENT" | "UNKNOWN";
   catalogObjectId?: string;
   locationId?: string;
   quantity?: string;
@@ -13,7 +13,7 @@ type HistoryItem = {
   calculatedAt?: string;
   referenceId?: string;
   source?: string;
-  label: "Lost" | "Inventory Received" | "Physical Count" | "Other";
+  label: "Lost" | "Inventory Received" | "Other";
 };
 
 function getLabelForAdjustment(fromState?: string, toState?: string) {
@@ -31,20 +31,6 @@ function getLabelForAdjustment(fromState?: string, toState?: string) {
 function normalizeInventoryChange(change: unknown): HistoryItem {
   const inventoryChange = change as {
     type?: string;
-    physicalCount?: {
-      id?: string;
-      catalogObjectId?: string;
-      locationId?: string;
-      quantity?: string;
-      occurredAt?: string;
-      calculatedAt?: string;
-      referenceId?: string;
-      source?: {
-        product?: string;
-        applicationId?: string;
-        name?: string;
-      };
-    };
     adjustment?: {
       id?: string;
       catalogObjectId?: string;
@@ -62,23 +48,6 @@ function normalizeInventoryChange(change: unknown): HistoryItem {
       };
     };
   };
-
-  if (inventoryChange.type === "PHYSICAL_COUNT") {
-    const physicalCount = inventoryChange.physicalCount;
-
-    return {
-      id: physicalCount?.id,
-      type: "PHYSICAL_COUNT",
-      catalogObjectId: physicalCount?.catalogObjectId,
-      locationId: physicalCount?.locationId,
-      quantity: physicalCount?.quantity,
-      occurredAt: physicalCount?.occurredAt,
-      calculatedAt: physicalCount?.calculatedAt,
-      referenceId: physicalCount?.referenceId,
-      source: physicalCount?.source?.name ?? physicalCount?.source?.product,
-      label: "Physical Count",
-    };
-  }
 
   if (inventoryChange.type === "ADJUSTMENT") {
     const adjustment = inventoryChange.adjustment;
@@ -145,17 +114,38 @@ export async function GET(request: Request) {
     const response = await squareClient.inventory.batchGetChanges({
       catalogObjectIds: catalogObjectId ? [catalogObjectId] : undefined,
       locationIds: [locationId],
-      types: ["PHYSICAL_COUNT", "ADJUSTMENT"],
+      types: ["ADJUSTMENT"],
       updatedAfter,
       limit,
     });
 
-    const changes = [];
+    const changes: HistoryItem[] = [];
+    let inspectedChangeCount = 0;
+    const maxChangesToInspect = 250;
 
     for await (const change of response) {
-      changes.push(normalizeInventoryChange(change));
+      inspectedChangeCount += 1;
 
-      if (changes.length >= limit) {
+      const normalizedChange = normalizeInventoryChange(change);
+
+      const isSpeakStockChange =
+        normalizedChange.referenceId?.startsWith("speakstock-") === true;
+
+      const isTrackedAdjustment =
+        normalizedChange.type === "ADJUSTMENT" &&
+        ((normalizedChange.fromState === "NONE" &&
+          normalizedChange.toState === "IN_STOCK") ||
+          (normalizedChange.fromState === "IN_STOCK" &&
+            normalizedChange.toState === "WASTE"));
+
+      if (isSpeakStockChange && isTrackedAdjustment) {
+        changes.push(normalizedChange);
+      }
+
+      if (
+        changes.length >= limit ||
+        inspectedChangeCount >= maxChangesToInspect
+      ) {
         break;
       }
     }
@@ -165,6 +155,7 @@ export async function GET(request: Request) {
       locationId,
       days,
       count: changes.length,
+      inspectedChangeCount,
       changes: changes.reverse(),
     });
   } catch (error) {

@@ -1021,7 +1021,7 @@ export default function InventoryPage() {
 
         <CollapsibleSection
           title="Recent Square Inventory Changes"
-          description="Recent inventory adjustments retrieved from Square for this location."
+          description="SpeakStock-submitted inventory received and lost adjustments from Square."
         >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -1097,7 +1097,7 @@ export default function InventoryPage() {
                       </p>
                       <p className="mt-1 text-sm text-zinc-400">
                         {formatHistoryDate(
-                          item.occurredAt ?? item.calculatedAt,
+                          item.calculatedAt ?? item.occurredAt,
                         )}
                       </p>
                     </div>
