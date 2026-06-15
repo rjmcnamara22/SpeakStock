@@ -52,7 +52,7 @@ type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
 
 type SquareInventoryHistoryItem = {
   id?: string;
-  type: "PHYSICAL_COUNT" | "ADJUSTMENT" | "UNKNOWN";
+  type: "ADJUSTMENT" | "UNKNOWN";
   catalogObjectId?: string;
   locationId?: string;
   quantity?: string;
@@ -62,7 +62,7 @@ type SquareInventoryHistoryItem = {
   calculatedAt?: string;
   referenceId?: string;
   source?: string;
-  label: "Loss" | "Inventory Received" | "Physical Count" | "Other";
+  label: "Lost" | "Inventory Received" | "Other";
 };
 
 type SquareInventoryHistoryResponse = {
@@ -185,7 +185,7 @@ export default function InventoryPage() {
       setIsLoadingHistory(true);
 
       const response = await fetch(
-        "/api/square/inventory/history?days=30&limit=25",
+        "/api/square/inventory/history?days=1&limit=25",
       );
 
       const data = (await response.json()) as SquareInventoryHistoryResponse;
@@ -269,12 +269,16 @@ export default function InventoryPage() {
       return "Inventory Received";
     }
 
-    if (item.label === "Loss") {
-      return "Loss";
+    if (item.label === "Lost") {
+      return "Lost";
     }
 
-    if (item.label === "Physical Count") {
-      return "Physical Count";
+    if (
+      item.type === "ADJUSTMENT" &&
+      item.fromState === "IN_STOCK" &&
+      item.toState === "WASTE"
+    ) {
+      return "Lost";
     }
 
     return "Inventory Change";
@@ -1070,7 +1074,7 @@ export default function InventoryPage() {
                         className={`text-sm font-semibold ${
                           item.label === "Inventory Received"
                             ? "text-emerald-400"
-                            : item.label === "Loss"
+                            : item.label === "Lost"
                               ? "text-red-400"
                               : "text-zinc-300"
                         }`}

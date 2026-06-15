@@ -34,16 +34,24 @@ function normalizeInventoryChange(change: unknown): HistoryItem {
     adjustment?: {
       id?: string;
       catalogObjectId?: string;
+      catalog_object_id?: string;
       locationId?: string;
+      location_id?: string;
       quantity?: string;
       fromState?: string;
+      from_state?: string;
       toState?: string;
+      to_state?: string;
       occurredAt?: string;
+      occurred_at?: string;
       calculatedAt?: string;
+      calculated_at?: string;
       referenceId?: string;
+      reference_id?: string;
       source?: {
         product?: string;
         applicationId?: string;
+        application_id?: string;
         name?: string;
       };
     };
@@ -52,19 +60,23 @@ function normalizeInventoryChange(change: unknown): HistoryItem {
   if (inventoryChange.type === "ADJUSTMENT") {
     const adjustment = inventoryChange.adjustment;
 
+    const fromState = adjustment?.fromState ?? adjustment?.from_state;
+    const toState = adjustment?.toState ?? adjustment?.to_state;
+
     return {
       id: adjustment?.id,
       type: "ADJUSTMENT",
-      catalogObjectId: adjustment?.catalogObjectId,
-      locationId: adjustment?.locationId,
+      catalogObjectId:
+        adjustment?.catalogObjectId ?? adjustment?.catalog_object_id,
+      locationId: adjustment?.locationId ?? adjustment?.location_id,
       quantity: adjustment?.quantity,
-      fromState: adjustment?.fromState,
-      toState: adjustment?.toState,
-      occurredAt: adjustment?.occurredAt,
-      calculatedAt: adjustment?.calculatedAt,
-      referenceId: adjustment?.referenceId,
+      fromState,
+      toState,
+      occurredAt: adjustment?.occurredAt ?? adjustment?.occurred_at,
+      calculatedAt: adjustment?.calculatedAt ?? adjustment?.calculated_at,
+      referenceId: adjustment?.referenceId ?? adjustment?.reference_id,
       source: adjustment?.source?.name ?? adjustment?.source?.product,
-      label: getLabelForAdjustment(adjustment?.fromState, adjustment?.toState),
+      label: getLabelForAdjustment(fromState, toState),
     };
   }
 
