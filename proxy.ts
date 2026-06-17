@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const protectedPageRoutes = ["/inventory"];
-const protectedApiRoutes = ["/api/square"];
+const protectedApiRoutes = ["/api/square", "/api/admin", "/api/inventory"];
 
 function isProtectedPath(pathname: string): boolean {
   return (
