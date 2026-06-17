@@ -325,6 +325,8 @@ export default function InventoryPage() {
 
       setEntries((currentEntries) => [...currentEntries, newEntry]);
 
+      void saveInventoryEntry(newEntry);
+
       setSuccessMessage(
         `Added ${parsedCommand.quantity} to ${matchedProduct.product.name}. Matched from "${matchedProduct.matchedAlias}".`,
       );
@@ -570,6 +572,32 @@ export default function InventoryPage() {
     });
 
     window.location.href = "/login";
+  }
+
+  async function saveInventoryEntry(entry: CountEntry) {
+    try {
+      const response = await fetch("/api/inventory/entries", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: entry.id,
+          productId: entry.productId,
+          productName: entry.productName,
+          quantity: entry.quantity,
+          rawText: entry.rawText,
+          source: entry.source,
+          createdAt: entry.createdAt,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error("Failed to save inventory entry:", await response.text());
+      }
+    } catch (error) {
+      console.error("Failed to save inventory entry:", error);
+    }
   }
 
   return (
