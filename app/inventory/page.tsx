@@ -20,6 +20,25 @@ type CollapsibleSectionProps = {
   children: React.ReactNode;
 };
 
+type HistoricalInventoryEntry = {
+  id: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  rawText: string;
+  source: "typed" | "voice";
+  createdAt: string;
+  submittedAt: string | null;
+  submissionId: string | null;
+};
+
+type HistoricalInventoryEntriesResponse = {
+  success?: boolean;
+  entries?: HistoricalInventoryEntry[];
+  error?: string;
+  details?: string;
+};
+
 type SpeechRecognitionResultLike = {
   transcript: string;
 };
@@ -143,39 +162,48 @@ export default function InventoryPage() {
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [submittedSessionSummary, setSubmittedSessionSummary] =
     useState<SubmittedSessionSummary | null>(null);
-
   const summaryRows = useMemo(() => {
     return buildInventorySummary(products, entries);
   }, [products, entries]);
-
   const discrepancyRows = useMemo(() => {
     return getDiscrepancyRows(summaryRows);
   }, [summaryRows]);
+  const [historicalEntries, setHistoricalEntries] = useState<
+    HistoricalInventoryEntry[]
+  >([]);
+  const [isLoadingHistoricalEntries, setIsLoadingHistoricalEntries] =
+    useState(false);
+  const [historicalEntriesError, setHistoricalEntriesError] = useState<
+    string | null
+  >(null);
 
-  async function loadProducts() {
+  async function loadHistoricalEntries() {
     try {
-      setIsLoadingProducts(true);
-      setProductsError(null);
+      setHistoricalEntriesError(null);
+      setIsLoadingHistoricalEntries(true);
 
-      const response = await fetch("/api/square/products");
+      const response = await fetch("/api/inventory/entries");
 
-      if (!response.ok) {
-        throw new Error("Failed to load products from Square.");
+      const data =
+        (await response.json()) as HistoricalInventoryEntriesResponse;
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.details ?? data.error ?? "Failed to load historical entries.",
+        );
       }
 
-      const data = (await response.json()) as {
-        products?: InventoryProduct[];
-      };
-
-      setProducts(data.products ?? []);
+      setHistoricalEntries(data.entries ?? []);
     } catch (caughtError) {
       if (caughtError instanceof Error) {
-        setProductsError(caughtError.message);
+        setHistoricalEntriesError(caughtError.message);
       } else {
-        setProductsError("Something went wrong while loading products.");
+        setHistoricalEntriesError(
+          "Something went wrong while loading historical entries.",
+        );
       }
     } finally {
-      setIsLoadingProducts(false);
+      setIsLoadingHistoricalEntries(false);
     }
   }
 
@@ -210,6 +238,33 @@ export default function InventoryPage() {
     }
   }
 
+  async function loadProducts() {
+    try {
+      setIsLoadingProducts(true);
+      setProductsError(null);
+
+      const response = await fetch("/api/square/products");
+
+      if (!response.ok) {
+        throw new Error("Failed to load products from Square.");
+      }
+
+      const data = (await response.json()) as {
+        products?: InventoryProduct[];
+      };
+
+      setProducts(data.products ?? []);
+    } catch (caughtError) {
+      if (caughtError instanceof Error) {
+        setProductsError(caughtError.message);
+      } else {
+        setProductsError("Something went wrong while loading products.");
+      }
+    } finally {
+      setIsLoadingProducts(false);
+    }
+  }
+
   useEffect(() => {
     if (!hasLoadedEntries) {
       return;
@@ -223,8 +278,9 @@ export default function InventoryPage() {
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void loadProducts();
+    void loadHistoricalEntries();
     void loadInventoryHistory();
+    void loadProducts();
   }, []);
 
   useEffect(() => {
@@ -325,7 +381,9 @@ export default function InventoryPage() {
 
       setEntries((currentEntries) => [...currentEntries, newEntry]);
 
-      void saveInventoryEntry(newEntry);
+      void saveInventoryEntry(newEntry).then(() => {
+        void loadHistoricalEntries();
+      });
 
       setSuccessMessage(
         `Added ${parsedCommand.quantity} to ${matchedProduct.product.name}. Matched from "${matchedProduct.matchedAlias}".`,
@@ -339,6 +397,13 @@ export default function InventoryPage() {
         setError("Something went wrong.");
       }
     }
+  }
+
+  function formatHistoricalEntryDate(value: string): string {
+    return new Intl.DateTimeFormat("en-US", {
+      dateStyle: "short",
+      timeStyle: "short",
+    }).format(new Date(value));
   }
 
   function handleUndoLastEntry() {
@@ -1191,6 +1256,85 @@ export default function InventoryPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          title="Historical Entry Log"
+          description="Saved typed and voice entries from the SpeakStock database."
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-zinc-400">
+              Shows the most recent 100 entries saved by SpeakStock.
+            </p>
+
+            <button
+              type="button"
+              onClick={loadHistoricalEntries}
+              disabled={isLoadingHistoricalEntries}
+              className="min-h-11 rounded-lg border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-300 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isLoadingHistoricalEntries ? "Refreshing..." : "Refresh Entries"}
+            </button>
+          </div>
+
+          {historicalEntriesError && (
+            <p className="mt-4 rounded-lg border border-red-900 bg-red-950 px-4 py-3 text-sm text-red-200">
+              {historicalEntriesError}
+            </p>
+          )}
+
+          {!historicalEntriesError && historicalEntries.length === 0 && (
+            <p className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm text-zinc-400">
+              {isLoadingHistoricalEntries
+                ? "Loading saved entries..."
+                : "No saved entries found."}
+            </p>
+          )}
+
+          {historicalEntries.length > 0 && (
+            <div className="mt-4 space-y-3">
+              {historicalEntries.map((entry) => (
+                <article
+                  key={entry.id}
+                  className="rounded-lg border border-zinc-800 bg-zinc-950 p-4"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <h3 className="font-semibold text-zinc-100">
+                        {entry.productName}
+                      </h3>
+
+                      <p className="mt-1 text-sm text-zinc-400">
+                        Raw input:{" "}
+                        <span className="text-zinc-300">{entry.rawText}</span>
+                      </p>
+
+                      <p className="mt-1 text-sm text-zinc-500">
+                        Source: {entry.source} ·{" "}
+                        {formatHistoricalEntryDate(entry.createdAt)}
+                      </p>
+                    </div>
+
+                    <div className="text-left sm:text-right">
+                      <p className="text-lg font-bold text-zinc-100">
+                        Qty {entry.quantity}
+                      </p>
+
+                      <p
+                        className={`mt-1 text-sm ${
+                          entry.submittedAt
+                            ? "text-emerald-400"
+                            : "text-zinc-500"
+                        }`}
+                      >
+                        {entry.submittedAt ? "Submitted" : "Not submitted"}
+                      </p>
+                    </div>
+                  </div>
+                </article>
+              ))}
             </div>
           )}
         </CollapsibleSection>
