@@ -30,7 +30,7 @@ export const productAliasOverrides: Record<string, string[]> = {
 
   "high noon": ["high noon", "highnoon", "high noon seltzer"],
 
-  "mich ultra": ["mich ultra", "michelob ultra", "mich"],
+  "mich ultra": ["mich ultra", "michelob ultra", "mich", "ultra"],
 
   "miller lite": ["miller", "miller lite", "millerlite"],
 
@@ -54,5 +54,5 @@ export const productAliasOverrides: Record<string, string[]> = {
 
   "twisted tea": ["twisted tea", "twea", "twistedtea"],
 
-  "white claw": ["white claw", "whiteclaw", "white claw seltzer"],
+  "white claw": ["white claw", "claw", "whiteclaw", "white claw seltzer"],
 };
