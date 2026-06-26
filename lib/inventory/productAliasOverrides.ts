@@ -1,4 +1,8 @@
 export const productAliasOverrides: Record<string, string[]> = {
+  "ath-hazy ipa": ["NA Hazy IPA", "N A Hazy IPA", "athletic hazy ipa"],
+
+  "ath-upside dawn": ["upside dawn", "NA Gold", "upsidedawn", "N A Gold"],
+
   "bud light": ["bud light", "budlight", "bud lite"],
 
   budweiser: ["budweiser", "bud", "bud weiser"],
@@ -18,6 +22,8 @@ export const productAliasOverrides: Record<string, string[]> = {
   ],
 
   "fh head hunter can": ["headhunter", "head hunter", "fat heads head hunter"],
+
+  "heineken 0": ["heineken 0", "heineken zero"],
 
   heineken: ["heineken", "heineken beer"],
 
