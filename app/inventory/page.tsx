@@ -13,6 +13,17 @@ import {
   getDiscrepancyRows,
 } from "@/lib/inventory/session";
 
+import {
+  buildSubmissionPreview,
+  formatHistoricalEntryDate,
+  formatHistoryDate,
+  formatSubmittedSessionDate,
+  getAdjustmentActionText,
+  getDifferenceLabel,
+  getHistoryItemTitle,
+  getProductNameForHistoryItem,
+} from "./helpers";
+
 type CollapsibleSectionProps = {
   title: string;
   description?: string;
@@ -302,54 +313,6 @@ export default function InventoryPage() {
     setHasLoadedEntries(true);
   }, []);
 
-  function formatHistoryDate(value?: string): string {
-    if (!value) {
-      return "Unknown time";
-    }
-
-    return new Intl.DateTimeFormat("en-US", {
-      dateStyle: "short",
-      timeStyle: "short",
-    }).format(new Date(value));
-  }
-
-  function formatSubmittedSessionDate(value: string): string {
-    return new Intl.DateTimeFormat("en-US", {
-      dateStyle: "medium",
-      timeStyle: "short",
-    }).format(new Date(value));
-  }
-
-  function getHistoryItemTitle(item: SquareInventoryHistoryItem): string {
-    if (item.label === "Inventory Received") {
-      return "Inventory Received";
-    }
-
-    if (item.label === "Lost") {
-      return "Lost";
-    }
-
-    if (
-      item.type === "ADJUSTMENT" &&
-      item.fromState === "IN_STOCK" &&
-      item.toState === "WASTE"
-    ) {
-      return "Lost";
-    }
-
-    return "Inventory Change";
-  }
-
-  function getProductNameForHistoryItem(
-    item: SquareInventoryHistoryItem,
-  ): string {
-    const product = products.find(
-      (candidate) => candidate.id === item.catalogObjectId,
-    );
-
-    return product?.name ?? item.catalogObjectId ?? "Unknown product";
-  }
-
   function handleAddEntry() {
     try {
       setError(null);
@@ -399,13 +362,6 @@ export default function InventoryPage() {
     }
   }
 
-  function formatHistoricalEntryDate(value: string): string {
-    return new Intl.DateTimeFormat("en-US", {
-      dateStyle: "short",
-      timeStyle: "short",
-    }).format(new Date(value));
-  }
-
   function handleUndoLastEntry() {
     setEntries((currentEntries) => currentEntries.slice(0, -1));
     setSubmissionPreview(null);
@@ -438,41 +394,6 @@ export default function InventoryPage() {
     setIsReviewConfirmed(false);
   }
 
-  function getAdjustmentActionText(difference: number): string {
-    if (difference < 0) {
-      return `Apply ${difference} as Lost`;
-    }
-
-    if (difference > 0) {
-      return `Apply +${difference} as Inventory Received`;
-    }
-
-    return "No correction";
-  }
-
-  function getDifferenceLabel(difference: number): string {
-    if (difference < 0) return "Lost";
-    if (difference > 0) return "Inventory Received";
-    return "No correction";
-  }
-
-  function getSubmissionLabel(
-    difference: number,
-  ): "Lost" | "Inventory Received" {
-    return difference < 0 ? "Lost" : "Inventory Received";
-  }
-
-  function buildSubmissionPreview(): InventorySubmissionPreview[] {
-    return discrepancyRows.map((row) => ({
-      productId: row.productId,
-      productName: row.productName,
-      squareCount: row.squareCount,
-      physicalCount: row.localCount,
-      difference: row.difference,
-      label: getSubmissionLabel(row.difference),
-    }));
-  }
-
   function handlePreviewSubmission() {
     setError(null);
     setVoiceError(null);
@@ -490,7 +411,7 @@ export default function InventoryPage() {
       return;
     }
 
-    setSubmissionPreview(buildSubmissionPreview());
+    setSubmissionPreview(buildSubmissionPreview(discrepancyRows));
     setSuccessMessage(
       `Prepared ${discrepancyRows.length} correction${
         discrepancyRows.length === 1 ? "" : "s"
@@ -515,7 +436,7 @@ export default function InventoryPage() {
       return;
     }
 
-    const preview = buildSubmissionPreview();
+    const preview = buildSubmissionPreview(discrepancyRows);
 
     try {
       setIsSubmittingToSquare(true);
@@ -1176,7 +1097,7 @@ export default function InventoryPage() {
                       </p>
 
                       <h3 className="mt-1 font-semibold text-zinc-100">
-                        {getProductNameForHistoryItem(item)}
+                        {getProductNameForHistoryItem(item, products)}
                       </h3>
 
                       <p className="mt-1 text-sm text-zinc-400">
