@@ -323,9 +323,7 @@ export default function InventoryPage() {
       setSubmittedSessionSummary(null);
 
       if (products.length === 0) {
-        setError(
-          "No products are loaded yet. Check your Square Sandbox products.",
-        );
+        setError("No products are loaded yet. Check your Square products.");
         return;
       }
 
@@ -483,7 +481,7 @@ export default function InventoryPage() {
       setSuccessMessage(
         `Submitted ${submittedCount} adjustment${
           submittedCount === 1 ? "" : "s"
-        } to Square Sandbox.`,
+        } to Square.`,
       );
 
       setEntries([]);
@@ -616,7 +614,7 @@ export default function InventoryPage() {
 
           {isLoadingProducts && (
             <p className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-zinc-300">
-              Loading products from Square Sandbox...
+              Loading products from Square...
             </p>
           )}
 
@@ -629,7 +627,7 @@ export default function InventoryPage() {
           {!isLoadingProducts && !productsError && (
             <p className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-zinc-300">
               Loaded {products.length} product{products.length === 1 ? "" : "s"}{" "}
-              from Square Sandbox.
+              from Square.
             </p>
           )}
         </section>
@@ -968,9 +966,7 @@ export default function InventoryPage() {
                 }
                 className="w-full rounded-lg bg-red-500 px-5 py-3 font-semibold text-white hover:bg-red-400 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400 sm:w-auto"
               >
-                {isSubmittingToSquare
-                  ? "Submitting..."
-                  : "Submit to Square Sandbox"}
+                {isSubmittingToSquare ? "Submitting..." : "Submit to Square"}
               </button>
             </div>
           </div>
