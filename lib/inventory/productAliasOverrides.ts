@@ -1,8 +1,4 @@
 export const productAliasOverrides: Record<string, string[]> = {
-  "ath-hazy ipa": ["NA Hazy IPA", "N A Hazy IPA", "athletic hazy ipa"],
-
-  "ath-upside dawn": ["upside dawn", "NA Gold", "upsidedawn", "N A Gold"],
-
   "bud light": ["bud light", "budlight", "bud lite"],
 
   budweiser: ["budweiser", "bud", "bud weiser"],
@@ -23,8 +19,6 @@ export const productAliasOverrides: Record<string, string[]> = {
 
   "fh head hunter can": ["headhunter", "head hunter", "fat heads head hunter"],
 
-  "heineken 0": ["heineken 0", "heineken zero"],
-
   heineken: ["heineken", "heineken beer"],
 
   "high life bottle": [
@@ -42,6 +36,50 @@ export const productAliasOverrides: Record<string, string[]> = {
 
   modelo: ["modelo", "model", "modelo beer"],
 
+  "n/a ipa athletic run wild": [
+    "non alcoholic ipa",
+    "NA IPA",
+    "N A IPA",
+    "athletic run wild",
+    "athletic ipa",
+  ],
+
+  "n/a athletic upside dawn golden": [
+    "non alcoholic gold",
+    "upside dawn",
+    "NA Gold",
+    "upsidedawn",
+    "N A Gold",
+  ],
+
+  "n/a hazy free wave ipa athletic": [
+    "non alcoholic hazy ipa",
+    "NA Hazy IPA",
+    "N A Hazy IPA",
+    "athletic hazy ipa",
+  ],
+
+  "n/a lite lager athletic": [
+    "non alcoholic lite",
+    "NA Lite Lager",
+    "N A Lite Lager",
+    "athletic lite lager",
+  ],
+
+  "n/a blue moon": ["non alcoholic blue moon", "NA Blue Moon", "N A Blue Moon"],
+
+  "n/a electro-lime best day": [
+    "non alcoholic lime",
+    "NA Electro Lime",
+    "N A Electro Lime",
+    "electro lime",
+    "electro lime best day",
+  ],
+
+  "n/a guinness 0": ["guinness 0", "guinness zero"],
+
+  "n/a heineken": ["heineken 0", "heineken zero"],
+
   narragansett: ["narragansett", "narragansett beer"],
 
   pabst: ["pabst", "pbr", "pabst blue ribbon"],
@@ -55,6 +93,10 @@ export const productAliasOverrides: Record<string, string[]> = {
     "sunny d",
     "sunny d seltzer",
   ],
+
+  spikedade: ["spikedade", "spiked ade", "spiked aid"],
+
+  superlyte: ["super", "super lyte", "super light"],
 
   truth: ["truth", "rhinegeist truth", "truth ipa"],
 
