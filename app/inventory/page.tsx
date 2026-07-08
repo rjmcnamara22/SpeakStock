@@ -153,6 +153,7 @@ function CollapsibleSection({
 export default function InventoryPage() {
   const [command, setCommand] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -187,6 +188,17 @@ export default function InventoryPage() {
   const [historicalEntriesError, setHistoricalEntriesError] = useState<
     string | null
   >(null);
+
+  async function loadAdminStatus() {
+    try {
+      const response = await fetch("/api/auth/status");
+      const data = (await response.json()) as { isAdmin?: boolean };
+
+      setIsAdmin(data.isAdmin === true);
+    } catch {
+      setIsAdmin(false);
+    }
+  }
 
   async function loadHistoricalEntries() {
     try {
@@ -289,6 +301,7 @@ export default function InventoryPage() {
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadAdminStatus();
     void loadHistoricalEntries();
     void loadInventoryHistory();
     void loadProducts();
@@ -434,6 +447,11 @@ export default function InventoryPage() {
       return;
     }
 
+    if (!isAdmin) {
+      window.location.href = "/login?next=/inventory";
+      return;
+    }
+
     const preview = buildSubmissionPreview(discrepancyRows);
 
     try {
@@ -555,7 +573,7 @@ export default function InventoryPage() {
       method: "POST",
     });
 
-    window.location.href = "/login";
+    setIsAdmin(false);
   }
 
   async function saveInventoryEntry(entry: CountEntry) {
@@ -598,12 +616,21 @@ export default function InventoryPage() {
               </h1>
             </div>
 
-            <button
-              onClick={handleLogout}
-              className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-300 hover:bg-zinc-800"
-            >
-              Log out
-            </button>
+            {isAdmin ? (
+              <button
+                onClick={handleLogout}
+                className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-300 hover:bg-zinc-800"
+              >
+                Log out
+              </button>
+            ) : (
+              <a
+                href="/login?next=/inventory"
+                className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-300 hover:bg-zinc-800"
+              >
+                Log in
+              </a>
+            )}
           </div>
           <p className="mt-2 max-w-2xl text-zinc-400">
             Type a count like{" "}

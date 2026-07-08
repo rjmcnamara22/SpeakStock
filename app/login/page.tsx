@@ -2,6 +2,21 @@
 
 import { useState } from "react";
 
+function getSafeNextPath(): string {
+  if (typeof window === "undefined") {
+    return "/inventory";
+  }
+
+  const searchParams = new URLSearchParams(window.location.search);
+  const nextPath = searchParams.get("next");
+
+  if (!nextPath || !nextPath.startsWith("/")) {
+    return "/inventory";
+  }
+
+  return nextPath;
+}
+
 export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +46,7 @@ export default function LoginPage() {
         throw new Error(data.error ?? "Login failed.");
       }
 
-      window.location.href = "/inventory";
+      window.location.href = getSafeNextPath();
     } catch (caughtError) {
       if (caughtError instanceof Error) {
         setError(caughtError.message);
@@ -50,10 +65,11 @@ export default function LoginPage() {
           SpeakStock
         </p>
 
-        <h1 className="mt-2 text-2xl font-bold">Enter inventory password</h1>
+        <h1 className="mt-2 text-2xl font-bold">Admin Login</h1>
 
         <p className="mt-2 text-sm text-zinc-400">
-          This protects the inventory page and Square inventory routes.
+          Sign in to access protected inventory actions, including Square
+          inventory adjustments.
         </p>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">

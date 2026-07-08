@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 type LoginRequestBody = {
@@ -5,31 +6,43 @@ type LoginRequestBody = {
 };
 
 export async function POST(request: Request) {
-  const sharedPassword = process.env.SPEAKSTOCK_SHARED_PASSWORD;
-  const sessionSecret = process.env.SPEAKSTOCK_SESSION_SECRET;
+  try {
+    const body = (await request.json()) as LoginRequestBody;
 
-  if (!sharedPassword || !sessionSecret) {
+    if (
+      typeof body.password !== "string" ||
+      body.password !== process.env.SPEAKSTOCK_SHARED_PASSWORD
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Incorrect password." },
+        { status: 401 },
+      );
+    }
+
+    const sessionSecret = process.env.SPEAKSTOCK_SESSION_SECRET;
+
+    if (!sessionSecret) {
+      throw new Error(
+        "Missing SPEAKSTOCK_SESSION_SECRET environment variable.",
+      );
+    }
+
+    const cookieStore = await cookies();
+
+    cookieStore.set("speakstock_session", sessionSecret, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Login error:", error);
+
     return NextResponse.json(
-      { error: "Authentication is not configured." },
+      { success: false, error: "Login failed." },
       { status: 500 },
     );
   }
-
-  const body = (await request.json()) as LoginRequestBody;
-
-  if (body.password !== sharedPassword) {
-    return NextResponse.json({ error: "Invalid password." }, { status: 401 });
-  }
-
-  const response = NextResponse.json({ success: true });
-
-  response.cookies.set("speakstock_session", sessionSecret, {
-    httpOnly: true,
-    sameSite: "strict",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 12,
-  });
-
-  return response;
 }
