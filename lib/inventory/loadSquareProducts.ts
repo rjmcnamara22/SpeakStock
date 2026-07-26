@@ -22,12 +22,19 @@ type SquareCatalogItemLike = {
     variations?: SquareCatalogVariationLike[];
     isArchived?: boolean;
     is_archived?: boolean;
+    categoryId?: string;
+    category_id?: string;
+    categories?: SquareCatalogObjectCategoryLike[];
   };
+
   item_data?: {
     name?: string;
     variations?: SquareCatalogVariationLike[];
     isArchived?: boolean;
     is_archived?: boolean;
+    categoryId?: string;
+    category_id?: string;
+    categories?: SquareCatalogObjectCategoryLike[];
   };
 };
 
@@ -62,6 +69,112 @@ type InventoryCountLike = {
   quantity?: string;
   state?: string;
 };
+
+type SquareCatalogObjectCategoryLike = {
+  id?: string;
+  ordinal?: bigint | number | string;
+};
+
+type SquareCatalogCategoryLike = {
+  id: string;
+  type?: string;
+  isDeleted?: boolean;
+  is_deleted?: boolean;
+  categoryData?: {
+    name?: string;
+  };
+  category_data?: {
+    name?: string;
+  };
+};
+
+const ALLOWED_CATEGORY_NAMES = new Set([
+  "beer",
+  "draft",
+  "gin",
+  "liqueur",
+  "rum",
+  "tequila",
+  "vodka",
+  "whiskey",
+  "wine",
+]);
+
+function isSquareCatalogCategoryLike(
+  value: unknown,
+): value is SquareCatalogCategoryLike {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const objectValue = value as {
+    id?: unknown;
+    type?: unknown;
+    categoryData?: unknown;
+    category_data?: unknown;
+  };
+
+  if (typeof objectValue.id !== "string" || objectValue.type !== "CATEGORY") {
+    return false;
+  }
+
+  const categoryData = objectValue.categoryData ?? objectValue.category_data;
+
+  if (!categoryData || typeof categoryData !== "object") {
+    return false;
+  }
+
+  return typeof (categoryData as { name?: unknown }).name === "string";
+}
+
+function getCategoryName(
+  category: SquareCatalogCategoryLike,
+): string | undefined {
+  return (category.categoryData ?? category.category_data)?.name;
+}
+
+function getItemCategoryIds(
+  itemData:
+    | SquareCatalogItemLike["itemData"]
+    | SquareCatalogItemLike["item_data"],
+): string[] {
+  if (!itemData) {
+    return [];
+  }
+
+  const categoryIds =
+    itemData.categories
+      ?.map((category) => category.id)
+      .filter(
+        (categoryId): categoryId is string => typeof categoryId === "string",
+      ) ?? [];
+
+  const legacyCategoryId = itemData.categoryId ?? itemData.category_id;
+
+  if (legacyCategoryId && !categoryIds.includes(legacyCategoryId)) {
+    categoryIds.push(legacyCategoryId);
+  }
+
+  return categoryIds;
+}
+
+function itemBelongsToAllowedCategory(
+  itemData:
+    | SquareCatalogItemLike["itemData"]
+    | SquareCatalogItemLike["item_data"],
+  categoryNamesById: Map<string, string>,
+): boolean {
+  const categoryIds = getItemCategoryIds(itemData);
+
+  return categoryIds.some((categoryId) => {
+    const categoryName = categoryNamesById.get(categoryId);
+
+    return (
+      categoryName !== undefined &&
+      ALLOWED_CATEGORY_NAMES.has(categoryName.trim().toLowerCase())
+    );
+  });
+}
 
 function isSquareCatalogItemLike(
   value: unknown,
@@ -208,13 +321,37 @@ function getQuantityAsNumber(quantity: string | undefined): number {
 }
 
 export async function loadSquareProducts(): Promise<SpeakStockProduct[]> {
-  const catalogResponse = await squareClient.catalog.search({
+  const itemResponse = await squareClient.catalog.search({
     objectTypes: ["ITEM"],
     includeDeletedObjects: false,
   });
 
-  const catalogObjects = (catalogResponse.objects ?? []) as unknown[];
-  const items = catalogObjects.filter(isSquareCatalogItemLike);
+  const categoryResponse = await squareClient.catalog.search({
+    objectTypes: ["CATEGORY"],
+    includeDeletedObjects: false,
+  });
+
+  const itemObjects = (itemResponse.objects ?? []) as unknown[];
+
+  const categoryObjects = (categoryResponse.objects ?? []) as unknown[];
+
+  const items = itemObjects.filter(isSquareCatalogItemLike);
+
+  const categories = categoryObjects.filter(isSquareCatalogCategoryLike);
+
+  const categoryNamesById = new Map(
+    categories
+      .map((category): [string, string] | null => {
+        const categoryName = getCategoryName(category);
+
+        if (!categoryName) {
+          return null;
+        }
+
+        return [category.id, categoryName];
+      })
+      .filter((entry): entry is [string, string] => entry !== null),
+  );
 
   const productDrafts: {
     id: string;
@@ -230,6 +367,10 @@ export async function loadSquareProducts(): Promise<SpeakStockProduct[]> {
     const itemData = getItemData(item);
 
     if (isArchivedItem(itemData)) {
+      continue;
+    }
+
+    if (!itemBelongsToAllowedCategory(itemData, categoryNamesById)) {
       continue;
     }
 
