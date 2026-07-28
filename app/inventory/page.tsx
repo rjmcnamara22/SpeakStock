@@ -157,6 +157,7 @@ export default function InventoryPage() {
   const [isListening, setIsListening] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [undoMessage, setUndoMessage] = useState<string | null>(null);
   const [isReviewConfirmed, setIsReviewConfirmed] = useState(false);
   const [submissionPreview, setSubmissionPreview] = useState<
     InventorySubmissionPreview[] | null
@@ -374,9 +375,24 @@ export default function InventoryPage() {
   }
 
   function handleUndoLastEntry() {
-    setEntries((currentEntries) => currentEntries.slice(0, -1));
-    setSubmissionPreview(null);
-    setIsReviewConfirmed(false);
+    setEntries((currentEntries) => {
+      const lastEntry = currentEntries[currentEntries.length - 1];
+
+      if (!lastEntry) {
+        setUndoMessage("No entry to undo.");
+        return currentEntries;
+      }
+
+      setUndoMessage(
+        `Undid last entry: ${lastEntry.productName} ${lastEntry.quantity}`,
+      );
+
+      window.setTimeout(() => {
+        setUndoMessage(null);
+      }, 4000);
+
+      return currentEntries.slice(0, -1);
+    });
   }
 
   function handleClearSession() {
@@ -704,6 +720,12 @@ export default function InventoryPage() {
             >
               Undo Last
             </button>
+
+            {undoMessage && (
+              <p className="mt-3 rounded-lg border border-emerald-900 bg-emerald-950 px-4 py-3 text-sm text-emerald-200">
+                {undoMessage}
+              </p>
+            )}
           </div>
 
           {error && (
