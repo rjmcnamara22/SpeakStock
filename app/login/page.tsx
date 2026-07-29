@@ -68,8 +68,7 @@ export default function LoginPage() {
         <h1 className="mt-2 text-2xl font-bold">Admin Login</h1>
 
         <p className="mt-2 text-sm text-zinc-400">
-          Sign in to access protected inventory actions, including Square
-          inventory adjustments.
+          Sign in to access protected inventory actions.
         </p>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
