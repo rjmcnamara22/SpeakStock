@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { squareClient } from "@/lib/square/client";
+import { requireAdmin } from "@/lib/auth/requireAdmin";
 
 type InventorySubmissionItem = {
   productId: string;
@@ -86,6 +87,13 @@ function buildInventoryAdjustmentChange(
 }
 
 export async function POST(request: Request) {
+  if (!(await requireAdmin())) {
+    return NextResponse.json(
+      { error: "Admin login required." },
+      { status: 401 },
+    );
+  }
+  
   try {
     const locationId = process.env.SQUARE_LOCATION_ID;
 
