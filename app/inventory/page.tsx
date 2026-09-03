@@ -181,6 +181,28 @@ export default function InventoryPage() {
   const discrepancyRows = useMemo(() => {
     return getDiscrepancyRows(summaryRows);
   }, [summaryRows]);
+  const countedItemCount = new Set(entries.map((entry) => entry.productId))
+    .size;
+  const pendingAdjustmentCount = discrepancyRows.length;
+
+  const sessionStats = [
+    {
+      label: "Products Loaded",
+      value: products.length,
+    },
+    {
+      label: "Entries Added",
+      value: entries.length,
+    },
+    {
+      label: "Items Counted",
+      value: countedItemCount,
+    },
+    {
+      label: "Adjustments Pending",
+      value: pendingAdjustmentCount,
+    },
+  ];
   const [historicalEntries, setHistoricalEntries] = useState<
     HistoricalInventoryEntry[]
   >([]);
@@ -442,7 +464,7 @@ export default function InventoryPage() {
     setSuccessMessage(
       `Prepared ${discrepancyRows.length} correction${
         discrepancyRows.length === 1 ? "" : "s"
-      } for future Square sync.`,
+      } for adjustment.`,
     );
   }
 
@@ -625,35 +647,58 @@ export default function InventoryPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-sm font-semibold uppercase tracking-wide text-emerald-400">
-                SpeakStock MVP
+                SpeakStock
               </p>
               <h1 className="mt-2 text-3xl font-bold">
-                Inventory Count Session
+                Inventory Reconciliation
               </h1>
             </div>
 
-            {isAdmin ? (
-              <button
-                onClick={handleLogout}
-                className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-300 hover:bg-zinc-800"
+            <div className="flex items-center gap-3">
+              <span
+                className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                  isAdmin
+                    ? "border-emerald-800 bg-emerald-950 text-emerald-300"
+                    : "border-zinc-700 bg-zinc-900 text-zinc-400"
+                }`}
               >
-                Log out
-              </button>
-            ) : (
-              <a
-                href="/login?next=/inventory"
-                className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-300 hover:bg-zinc-800"
-              >
-                Log in
-              </a>
-            )}
+                {isAdmin ? "Admin Mode" : "Public View"}
+              </span>
+
+              {isAdmin ? (
+                <button
+                  onClick={handleLogout}
+                  className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-300 hover:bg-zinc-800"
+                >
+                  Log out
+                </button>
+              ) : (
+                <a
+                  href="/login?next=/inventory"
+                  className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-300 hover:bg-zinc-800"
+                >
+                  Log in
+                </a>
+              )}
+            </div>
           </div>
           <p className="mt-2 max-w-2xl text-zinc-400">
-            Type a count like{" "}
+            Voice-assisted inventory counting with Square-backed product
+            matching and adjustment review. Type a count like{" "}
             <span className="font-semibold text-zinc-200">Miller Lite 48</span>.
-            Each entry adds to the local physical count. At the end, review the
-            difference between the local count and Square count.
           </p>
+
+          <div
+            className={`mt-4 rounded-lg border px-4 py-3 text-sm ${
+              isAdmin
+                ? "border-emerald-900 bg-emerald-950 text-emerald-200"
+                : "border-zinc-800 bg-zinc-900 text-zinc-300"
+            }`}
+          >
+            {isAdmin
+              ? "Admin Mode: Square inventory adjustments are enabled."
+              : "Public View: You can count and review inventory, but Square adjustments require admin login."}
+          </div>
 
           {isLoadingProducts && (
             <p className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-zinc-300">
@@ -673,6 +718,22 @@ export default function InventoryPage() {
               from Square.
             </p>
           )}
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {sessionStats.map((stat) => (
+              <div
+                key={stat.label}
+                className="rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3"
+              >
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  {stat.label}
+                </p>
+                <p className="mt-2 text-2xl font-bold text-zinc-100">
+                  {stat.value}
+                </p>
+              </div>
+            ))}
+          </div>
         </section>
 
         <section className="sticky top-0 z-10 rounded-xl border border-zinc-800 bg-zinc-900/95 p-4 backdrop-blur sm:p-5">
@@ -1003,7 +1064,7 @@ export default function InventoryPage() {
                 disabled={discrepancyRows.length === 0 || !isReviewConfirmed}
                 className="w-full rounded-lg bg-emerald-500 px-5 py-3 font-semibold text-zinc-950 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400 sm:w-auto"
               >
-                Preview Future Square Sync
+                Preview Square Adjustments
               </button>
 
               <button
@@ -1015,7 +1076,11 @@ export default function InventoryPage() {
                 }
                 className="w-full rounded-lg bg-red-500 px-5 py-3 font-semibold text-white hover:bg-red-400 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400 sm:w-auto"
               >
-                {isSubmittingToSquare ? "Submitting..." : "Submit to Square"}
+                {isSubmittingToSquare
+                  ? "Submitting..."
+                  : isAdmin
+                    ? "Submit Adjustments to Square"
+                    : "Log in to Submit to Square"}
               </button>
             </div>
           </div>
