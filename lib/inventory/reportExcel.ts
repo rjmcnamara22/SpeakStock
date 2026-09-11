@@ -2,7 +2,6 @@ import ExcelJS from "exceljs";
 
 export type ReportSummaryRow = {
   productName: string;
-  operatorName: string;
   squareCount: number;
   physicalCount: number;
   difference: number;
@@ -12,7 +11,6 @@ export type ReportSummaryRow = {
 
 export type ReportEntryRow = {
   time: string;
-  operatorName: string;
   productName: string;
   quantity: number;
   rawText: string;
@@ -22,13 +20,11 @@ export type ReportEntryRow = {
 type InventoryReport = {
   summaryRows: ReportSummaryRow[];
   entryRows: ReportEntryRow[];
-  reportDate: Date;
 };
 
 export async function buildInventoryReportExcel({
   summaryRows,
   entryRows,
-  reportDate,
 }: InventoryReport): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
 
@@ -40,7 +36,6 @@ export async function buildInventoryReportExcel({
 
   summarySheet.columns = [
     { header: "Product", key: "productName", width: 28 },
-    { header: "Operator", key: "operatorName", width: 20 },
     { header: "Square Count", key: "squareCount", width: 16 },
     { header: "Physical Count", key: "physicalCount", width: 18 },
     { header: "Difference", key: "difference", width: 14 },
@@ -58,7 +53,6 @@ export async function buildInventoryReportExcel({
 
   entrySheet.columns = [
     { header: "Time", key: "time", width: 14 },
-    { header: "Operator", key: "operatorName", width: 20 },
     { header: "Product", key: "productName", width: 28 },
     { header: "Quantity", key: "quantity", width: 12 },
     { header: "Input", key: "rawText", width: 32 },
@@ -92,11 +86,6 @@ export async function buildInventoryReportExcel({
       to: `${String.fromCharCode(64 + sheet.columnCount)}1`,
     };
   }
-
-  const reportDateText = reportDate.toISOString().slice(0, 10);
-
-  summarySheet.addRow([]);
-  summarySheet.addRow(["Report Date", reportDateText]);
 
   const buffer = await workbook.xlsx.writeBuffer();
 

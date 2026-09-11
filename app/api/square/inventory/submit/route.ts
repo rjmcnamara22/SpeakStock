@@ -2,6 +2,12 @@ import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { squareClient } from "@/lib/square/client";
 import { requireAdmin } from "@/lib/auth/requireAdmin";
+import {
+  buildInventoryReportExcel,
+  buildInventoryReportFilename,
+} from "@/lib/inventory/reportExcel";
+import { buildInventoryReportData } from "@/lib/inventory/reportData";
+import { sql } from "@/lib/db/client";
 
 type InventorySubmissionItem = {
   productId: string;
@@ -93,7 +99,7 @@ export async function POST(request: Request) {
       { status: 401 },
     );
   }
-  
+
   try {
     const locationId = process.env.SQUARE_LOCATION_ID;
 
@@ -134,6 +140,76 @@ export async function POST(request: Request) {
       idempotencyKey: randomUUID(),
       changes,
       ignoreUnchangedCounts: true,
+    });
+
+    const submissionId = randomUUID();
+
+    await sql`
+  INSERT INTO inventory_submissions (
+    id,
+    submitted_at,
+    submitted_count
+  )
+  VALUES (
+    ${submissionId},
+    ${occurredAt},
+    ${adjustmentItems.length}
+  );
+`;
+
+    for (const item of adjustmentItems) {
+      await sql`
+    INSERT INTO inventory_submission_items (
+      id,
+      submission_id,
+      product_id,
+      product_name,
+      square_count,
+      physical_count,
+      difference,
+      label,
+      adjustment_quantity,
+      created_at
+    )
+    VALUES (
+      ${randomUUID()},
+      ${submissionId},
+      ${item.productId},
+      ${item.productName},
+      ${item.squareCount},
+      ${item.physicalCount},
+      ${item.difference},
+      ${getAdjustmentReason(item.difference)},
+      ${Math.abs(item.difference)},
+      ${occurredAt}
+    );
+  `;
+    }
+
+    await sql`
+      UPDATE inventory_entries
+      SET
+        submitted_at = ${occurredAt},
+        submission_id = ${submissionId}
+      WHERE submitted_at IS NULL
+        AND created_at <= ${occurredAt};
+    `;
+
+    const reportData = await buildInventoryReportData({
+      submissionId,
+      submittedAt: occurredAt,
+    });
+
+    const reportBuffer = await buildInventoryReportExcel({
+      summaryRows: reportData.summaryRows,
+      entryRows: reportData.entryRows,
+    });
+
+    const reportFilename = buildInventoryReportFilename(new Date(occurredAt));
+
+    console.log("Inventory report generated:", {
+      reportFilename,
+      size: reportBuffer.length,
     });
 
     return NextResponse.json({
