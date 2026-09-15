@@ -8,6 +8,7 @@ import {
 } from "@/lib/inventory/reportExcel";
 import { buildInventoryReportData } from "@/lib/inventory/reportData";
 import { sql } from "@/lib/db/client";
+import { sendInventoryReportEmail } from "@/lib/inventory/reportEmail";
 
 type InventorySubmissionItem = {
   productId: string;
@@ -207,10 +208,15 @@ export async function POST(request: Request) {
 
     const reportFilename = buildInventoryReportFilename(new Date(occurredAt));
 
-    console.log("Inventory report generated:", {
-      reportFilename,
-      size: reportBuffer.length,
-    });
+    try {
+      await sendInventoryReportEmail({
+        reportBuffer,
+        reportFilename,
+        reportDate: new Date(occurredAt),
+      });
+    } catch (error) {
+      console.error("Inventory report email failed:", error);
+    }
 
     return NextResponse.json({
       success: true,
