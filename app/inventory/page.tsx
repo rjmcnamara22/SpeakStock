@@ -365,6 +365,20 @@ export default function InventoryPage() {
 
       const parsedCommand = parseCountCommand(command);
       const matchedProduct = matchProduct(parsedCommand.productText, products);
+      const currentProductCount = entries
+        .filter((entry) => entry.productId === matchedProduct.product.id)
+        .reduce((total, entry) => total + entry.quantity, 0);
+
+      const updatedProductCount = currentProductCount + parsedCommand.quantity;
+
+      if (updatedProductCount < 0) {
+        setError(
+          `Cannot subtract ${Math.abs(parsedCommand.quantity)} from ${
+            matchedProduct.product.name
+          }. The current session count is ${currentProductCount}.`,
+        );
+        return;
+      }
 
       const newEntry: CountEntry = {
         id: crypto.randomUUID(),
@@ -382,8 +396,14 @@ export default function InventoryPage() {
         void loadHistoricalEntries();
       });
 
+      const isCorrection = parsedCommand.quantity < 0;
+
       setSuccessMessage(
-        `Added ${parsedCommand.quantity} to ${matchedProduct.product.name}. Matched from "${matchedProduct.matchedAlias}".`,
+        `${
+          isCorrection
+            ? `Subtracted ${Math.abs(parsedCommand.quantity)} from`
+            : `Added ${parsedCommand.quantity} to`
+        } ${matchedProduct.product.name}. Current session count: ${updatedProductCount}. Matched from "${matchedProduct.matchedAlias}".`,
       );
 
       setCommand("");

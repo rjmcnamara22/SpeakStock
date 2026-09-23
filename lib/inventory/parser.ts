@@ -42,8 +42,10 @@ function normalizeInput(input: string): string {
   return input
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ");
+    .replace(/[−–—]/g, "-")
+    .replace(/[^a-z0-9\s-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function parseNumberWords(words: string[]): number | null {
@@ -101,28 +103,57 @@ function parseQuantityFromEnd(words: string[]): {
     return null;
   }
 
-  const digitQuantity = Number(lastWord);
+  let quantity: number | null = null;
+  let quantityStartIndex = words.length - 1;
+  let isNegative = false;
 
-  if (Number.isInteger(digitQuantity) && digitQuantity >= 0) {
-    return {
-      productWords: words.slice(0, -1),
-      quantity: digitQuantity,
-    };
-  }
+  // handle numeric quantities
+  if (/^-?\d+$/.test(lastWord)) {
+    quantity = Number(lastWord);
+    isNegative = lastWord.startsWith("-");
+  } else {
+    // handle spoken quantities
+    for (let startIndex = words.length - 1; startIndex >= 0; startIndex--) {
+      const possibleNumberWords = words.slice(startIndex);
+      const parsedNumber = parseNumberWords(possibleNumberWords);
 
-  for (let startIndex = words.length - 1; startIndex >= 0; startIndex--) {
-    const possibleNumberWords = words.slice(startIndex);
-    const quantity = parseNumberWords(possibleNumberWords);
-
-    if (quantity !== null && Number.isInteger(quantity) && quantity >= 0) {
-      return {
-        productWords: words.slice(0, startIndex),
-        quantity,
-      };
+      if (
+        parsedNumber !== null &&
+        Number.isInteger(parsedNumber) &&
+        parsedNumber >= 0
+      ) {
+        quantity = parsedNumber;
+        quantityStartIndex = startIndex;
+      } else {
+        break;
+      }
     }
   }
 
-  return null;
+  if (quantity === null || !Number.isSafeInteger(quantity)) {
+    return null;
+  }
+
+  // recognize 'minus' or 'subtract' before the quantity
+  const precedingWord = words[quantityStartIndex - 1];
+
+  if (precedingWord === "minus" || precedingWord === "subtract") {
+    isNegative = true;
+    quantityStartIndex--;
+  } else if (precedingWord === "-") {
+    isNegative = true;
+    quantityStartIndex--;
+  }
+
+  // avoid interpreting a negative number as an addition
+  if (isNegative) {
+    quantity = -Math.abs(quantity);
+  }
+
+  return {
+    productWords: words.slice(0, quantityStartIndex),
+    quantity,
+  };
 }
 
 export function parseCountCommand(input: string): ParsedCountCommand {
@@ -137,7 +168,7 @@ export function parseCountCommand(input: string): ParsedCountCommand {
 
   if (!parsedQuantity) {
     throw new Error(
-      'Use a format like "Miller Lite 48", "Miller Lite two", or "Miller Lite, 48".',
+      'Use a format like "Miller Lite 48", "Miller Lite minus 1", or "Miller Lite -1".',
     );
   }
 
