@@ -118,6 +118,12 @@ declare global {
 
 const INVENTORY_ENTRIES_STORAGE_KEY = "speakstock_inventory_entries";
 
+function getProductCount(entries: CountEntry[], productId: string): number {
+  return entries
+    .filter((entry) => entry.productId === productId)
+    .reduce((total, entry) => total + entry.quantity, 0);
+}
+
 function CollapsibleSection({
   title,
   description,
@@ -168,6 +174,7 @@ export default function InventoryPage() {
   const [productsError, setProductsError] = useState<string | null>(null);
   const [entries, setEntries] = useState<CountEntry[]>([]);
   const [hasLoadedEntries, setHasLoadedEntries] = useState(false);
+  const [isSavingEntry, setIsSavingEntry] = useState(false);
   const [historyItems, setHistoryItems] = useState<
     SquareInventoryHistoryItem[]
   >([]);
@@ -349,7 +356,13 @@ export default function InventoryPage() {
     setHasLoadedEntries(true);
   }, []);
 
-  function handleAddEntry() {
+  async function handleAddEntry() {
+    if (isSavingEntry) {
+      return;
+    }
+
+    setIsSavingEntry(true);
+
     try {
       setError(null);
       setVoiceError(null);
@@ -390,11 +403,10 @@ export default function InventoryPage() {
         createdAt: new Date().toISOString(),
       };
 
-      setEntries((currentEntries) => [...currentEntries, newEntry]);
+      await saveInventoryEntry(newEntry);
 
-      void saveInventoryEntry(newEntry).then(() => {
-        void loadHistoricalEntries();
-      });
+      setEntries((currentEntries) => [...currentEntries, newEntry]);
+      void loadHistoricalEntries();
 
       const isCorrection = parsedCommand.quantity < 0;
 
@@ -413,31 +425,55 @@ export default function InventoryPage() {
       } else {
         setError("Something went wrong.");
       }
+    } finally {
+      setIsSavingEntry(false);
     }
   }
 
   function handleUndoLastEntry() {
-    setEntries((currentEntries) => {
-      const lastEntry = currentEntries[currentEntries.length - 1];
+    if (isSavingEntry) {
+      return;
+    }
 
-      if (!lastEntry) {
-        setUndoMessage("No entry to undo.");
-        return currentEntries;
-      }
+    const lastEntry = entries[entries.length - 1];
 
+    if (!lastEntry) {
+      setUndoMessage("No entry to undo.");
+      return;
+    }
+
+    const remainingEntries = entries.slice(0, -1);
+
+    const remainingProductCount = getProductCount(
+      remainingEntries,
+      lastEntry.productId,
+    );
+
+    if (remainingProductCount < 0) {
       setUndoMessage(
-        `Undid last entry: ${lastEntry.productName} ${lastEntry.quantity}`,
+        `Cannot undo this entry because it would leave ${lastEntry.productName} with a negative count.`,
       );
+      return;
+    }
 
-      window.setTimeout(() => {
-        setUndoMessage(null);
-      }, 4000);
+    setEntries(remainingEntries);
+    setSubmissionPreview(null);
+    setIsReviewConfirmed(false);
 
-      return currentEntries.slice(0, -1);
-    });
+    setUndoMessage(
+      `Undid last entry: ${lastEntry.productName} ${lastEntry.quantity}`,
+    );
+
+    window.setTimeout(() => {
+      setUndoMessage(null);
+    }, 4000);
   }
 
   function handleClearSession() {
+    if (isSavingEntry) {
+      return;
+    }
+
     setEntries([]);
     setError(null);
     setVoiceError(null);
@@ -448,14 +484,41 @@ export default function InventoryPage() {
   }
 
   function handleDeleteEntry(entryId: string) {
-    setEntries((currentEntries) =>
-      currentEntries.filter((entry) => entry.id !== entryId),
+    if (isSavingEntry) {
+      return;
+    }
+
+    const entryToDelete = entries.find((entry) => entry.id === entryId);
+
+    if (!entryToDelete) {
+      return;
+    }
+
+    const remainingEntries = entries.filter((entry) => entry.id !== entryId);
+
+    const remainingProductCount = getProductCount(
+      remainingEntries,
+      entryToDelete.productId,
     );
+
+    if (remainingProductCount < 0) {
+      setError(
+        `Cannot delete this entry because it would leave ${entryToDelete.productName} with a negative count.`,
+      );
+      return;
+    }
+
+    setEntries(remainingEntries);
     setSubmissionPreview(null);
     setIsReviewConfirmed(false);
+    setError(null);
   }
 
   function handleResetProduct(productId: string) {
+    if (isSavingEntry) {
+      return;
+    }
+
     setEntries((currentEntries) =>
       currentEntries.filter((entry) => entry.productId !== productId),
     );
@@ -634,29 +697,25 @@ export default function InventoryPage() {
     setIsAdmin(false);
   }
 
-  async function saveInventoryEntry(entry: CountEntry) {
-    try {
-      const response = await fetch("/api/inventory/entries", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          id: entry.id,
-          productId: entry.productId,
-          productName: entry.productName,
-          quantity: entry.quantity,
-          rawText: entry.rawText,
-          source: entry.source,
-          createdAt: entry.createdAt,
-        }),
-      });
+  async function saveInventoryEntry(entry: CountEntry): Promise<void> {
+    const response = await fetch("/api/inventory/entries", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        id: entry.id,
+        productId: entry.productId,
+        productName: entry.productName,
+        quantity: entry.quantity,
+        rawText: entry.rawText,
+        source: entry.source,
+        createdAt: entry.createdAt,
+      }),
+    });
 
-      if (!response.ok) {
-        console.error("Failed to save inventory entry:", await response.text());
-      }
-    } catch (error) {
-      console.error("Failed to save inventory entry:", error);
+    if (!response.ok) {
+      throw new Error("Failed to save inventory entry. Please try again.");
     }
   }
 
@@ -788,10 +847,12 @@ export default function InventoryPage() {
 
             <button
               onClick={handleAddEntry}
-              disabled={isLoadingProducts || products.length === 0}
+              disabled={
+                isLoadingProducts || products.length === 0 || isSavingEntry
+              }
               className="min-h-12 rounded-lg bg-emerald-500 px-5 py-3 text-base font-semibold text-zinc-950 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400"
             >
-              Add Count
+              {isSavingEntry ? "Saving..." : "Add Count"}
             </button>
 
             <button

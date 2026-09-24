@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db/client";
+import { requireAdmin } from "@/lib/auth/requireAdmin";
 
 type CreateEntryRequest = {
   id: string;
@@ -43,8 +44,8 @@ function isCreateEntryRequest(value: unknown): value is CreateEntryRequest {
     typeof body.productId === "string" &&
     typeof body.productName === "string" &&
     typeof body.quantity === "number" &&
-    Number.isInteger(body.quantity) &&
-    body.quantity >= 0 &&
+    Number.isSafeInteger(body.quantity) &&
+    body.quantity !== 0 &&
     typeof body.rawText === "string" &&
     (body.source === "typed" || body.source === "voice") &&
     typeof body.createdAt === "string"
@@ -139,6 +140,64 @@ export async function GET() {
     return NextResponse.json(
       {
         error: "Failed to load inventory entries.",
+        details:
+          process.env.NODE_ENV === "development" && error instanceof Error
+            ? error.message
+            : undefined,
+      },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(request: Request) {
+  if (!(await requireAdmin())) {
+    return NextResponse.json(
+      { error: "Admin login required to delete inventory entries." },
+      { status: 401 },
+    );
+  }
+
+  try {
+    const body = (await request.json()) as {
+      id?: unknown;
+    };
+
+    if (typeof body.id !== "string" || body.id.trim().length === 0) {
+      return NextResponse.json(
+        { error: "A valid inventory entry ID is required." },
+        { status: 400 },
+      );
+    }
+
+    const deletedRows = await sql`
+      DELETE FROM inventory_entries
+      WHERE id = ${body.id}
+        AND submitted_at IS NULL
+        AND submission_id IS NULL
+      RETURNING id;
+    `;
+
+    if (deletedRows.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "Entry not found or already submitted. Submitted entries cannot be deleted.",
+        },
+        { status: 404 },
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      deletedId: body.id,
+    });
+  } catch (error) {
+    console.error("Delete inventory entry error:", error);
+
+    return NextResponse.json(
+      {
+        error: "Failed to delete inventory entry.",
         details:
           process.env.NODE_ENV === "development" && error instanceof Error
             ? error.message
