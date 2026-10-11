@@ -84,33 +84,57 @@ export function getProductSuggestions(
   products: InventoryProduct[],
   limit = 3,
 ): ProductSuggestion[] {
+  const normalizedInput = normalizeText(productText);
   const suggestions: ProductSuggestion[] = [];
 
   for (const product of products) {
-    for (const alias of getProductAliases(product)) {
-      const score = similarityScore(productText, alias);
+    const normalizedName = normalizeText(product.name);
 
+    // Explicit aliases take priority over product-name similarity.
+    const exactAlias = product.aliases.find(
+      (alias) => normalizeText(alias) === normalizedInput,
+    );
+
+    if (exactAlias) {
       suggestions.push({
         product,
-        matchedAlias: alias,
-        score,
+        matchedAlias: exactAlias,
+        score: 1.1,
       });
+      continue;
     }
+
+    // Exact product-name matches come next.
+    if (normalizedName === normalizedInput) {
+      suggestions.push({
+        product,
+        matchedAlias: product.name,
+        score: 1,
+      });
+      continue;
+    }
+
+    // Fall back to existing similarity matching.
+    let bestAlias = product.name;
+    let bestScore = similarityScore(productText, product.name);
+
+    for (const alias of product.aliases) {
+      const score = similarityScore(productText, alias);
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestAlias = alias;
+      }
+    }
+
+    suggestions.push({
+      product,
+      matchedAlias: bestAlias,
+      score: bestScore,
+    });
   }
 
-  const bestByProduct = new Map<string, ProductSuggestion>();
-
-  for (const suggestion of suggestions) {
-    const existingSuggestion = bestByProduct.get(suggestion.product.id);
-
-    if (!existingSuggestion || suggestion.score > existingSuggestion.score) {
-      bestByProduct.set(suggestion.product.id, suggestion);
-    }
-  }
-
-  return Array.from(bestByProduct.values())
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+  return suggestions.sort((a, b) => b.score - a.score).slice(0, limit);
 }
 
 export function matchProduct(
