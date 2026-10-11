@@ -21,7 +21,7 @@ export const productAliasOverrides: Record<string, string[]> = {
 
   heineken: ["heineken", "heineken beer"],
 
-  "miller high life bottle": [
+  "high life bottle": [
     "miller high life",
     "miller hi life",
     "high life",
