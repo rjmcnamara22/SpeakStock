@@ -2,6 +2,7 @@ export type InventoryProduct = {
   id: string;
   name: string;
   aliases: string[];
+  explicitAliases: string[];
   squareCount: number;
 };
 

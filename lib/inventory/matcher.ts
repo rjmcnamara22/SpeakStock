@@ -75,10 +75,6 @@ function similarityScore(a: string, b: string): number {
   return 1 - distance / longestLength;
 }
 
-function getProductAliases(product: InventoryProduct): string[] {
-  return [product.name, ...product.aliases];
-}
-
 export function getProductSuggestions(
   productText: string,
   products: InventoryProduct[],
@@ -88,24 +84,22 @@ export function getProductSuggestions(
   const suggestions: ProductSuggestion[] = [];
 
   for (const product of products) {
-    const normalizedName = normalizeText(product.name);
-
-    // Explicit aliases take priority over product-name similarity.
-    const exactAlias = product.aliases.find(
+    // explicitly configured aliases.
+    const explicitAlias = product.explicitAliases?.find(
       (alias) => normalizeText(alias) === normalizedInput,
     );
 
-    if (exactAlias) {
+    if (explicitAlias) {
       suggestions.push({
         product,
-        matchedAlias: exactAlias,
+        matchedAlias: explicitAlias,
         score: 1.1,
       });
       continue;
     }
 
-    // Exact product-name matches come next.
-    if (normalizedName === normalizedInput) {
+    // exact Square product name.
+    if (normalizeText(product.name) === normalizedInput) {
       suggestions.push({
         product,
         matchedAlias: product.name,
@@ -114,7 +108,7 @@ export function getProductSuggestions(
       continue;
     }
 
-    // Fall back to existing similarity matching.
+    // automatically generated aliases and fuzzy matching.
     let bestAlias = product.name;
     let bestScore = similarityScore(productText, product.name);
 
@@ -130,7 +124,7 @@ export function getProductSuggestions(
     suggestions.push({
       product,
       matchedAlias: bestAlias,
-      score: bestScore,
+      score: Math.min(bestScore, 0.99),
     });
   }
 

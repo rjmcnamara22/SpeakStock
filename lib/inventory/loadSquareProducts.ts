@@ -5,6 +5,7 @@ export type SpeakStockProduct = {
   id: string;
   name: string;
   aliases: string[];
+  explicitAliases: string[];
   squareCount: number;
 };
 
@@ -288,25 +289,20 @@ function removeInventoryDescriptorWords(value: string): string {
     .trim();
 }
 
+function getExplicitAliases(name: string): string[] {
+  const normalizedName = normalizeAlias(name);
+
+  return Array.from(
+    new Set((productAliasOverrides[normalizedName] ?? []).map(normalizeAlias)),
+  ).filter(Boolean);
+}
+
 function buildAliases(name: string): string[] {
   const normalizedName = normalizeAlias(name);
   const simplifiedName = removeInventoryDescriptorWords(name);
 
-  const overrideAliases = [
-    ...(productAliasOverrides[normalizedName] ?? []),
-    ...(productAliasOverrides[simplifiedName] ?? []),
-  ];
-
   return Array.from(
-    new Set([
-      normalizedName,
-      simplifiedName,
-      normalizedName.replace(/\bhi\b/g, "high"),
-      simplifiedName.replace(/\bhi\b/g, "high"),
-      normalizedName.replace(/\bhigh\b/g, "hi"),
-      simplifiedName.replace(/\bhigh\b/g, "hi"),
-      ...overrideAliases.map(normalizeAlias),
-    ]),
+    new Set([normalizedName, simplifiedName, ...getExplicitAliases(name)]),
   ).filter(Boolean);
 }
 
@@ -357,6 +353,7 @@ export async function loadSquareProducts(): Promise<SpeakStockProduct[]> {
     id: string;
     name: string;
     aliases: string[];
+    explicitAliases: string[];
   }[] = [];
 
   for (const item of items) {
@@ -403,6 +400,7 @@ export async function loadSquareProducts(): Promise<SpeakStockProduct[]> {
         id: variation.id,
         name: productName,
         aliases: buildAliases(productName),
+        explicitAliases: getExplicitAliases(productName),
       });
     }
   }
@@ -443,6 +441,7 @@ export async function loadSquareProducts(): Promise<SpeakStockProduct[]> {
     id: product.id,
     name: product.name,
     aliases: product.aliases,
+    explicitAliases: product.explicitAliases,
     squareCount: countsByVariationId.get(product.id) ?? 0,
   }));
 }
