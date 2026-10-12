@@ -2,8 +2,8 @@ import ExcelJS from "exceljs";
 
 export type ReportSummaryRow = {
   productName: string;
-  squareCount: number;
-  physicalCount: number;
+  squareCount: number | null;
+  physicalCount: number | null;
   difference: number;
   sevenDayDifference: number;
   adjustment: "Lost" | "Inventory Received" | "None";

@@ -23,6 +23,7 @@ type EntryRow = {
 
 type SevenDayDifferenceRow = {
   product_id: string;
+  product_name: string;
   total_difference: number | string | null;
 };
 
@@ -67,33 +68,60 @@ export async function buildInventoryReportData({
 
   const sevenDayDifferences = (await sql`
     SELECT
-      product_id,
-      SUM(difference) AS total_difference
-    FROM inventory_submission_items
-    WHERE created_at >= ${submittedAt}::timestamptz - INTERVAL '7 days'
-      AND created_at <= ${submittedAt}::timestamptz
-    GROUP BY product_id
+      isi.product_id,
+      (ARRAY_AGG(
+        isi.product_name
+        ORDER BY isi.created_at DESC
+      ))[1] AS product_name,
+      SUM(isi.difference) AS total_difference
+    FROM inventory_submission_items AS isi
+    WHERE isi.created_at >= (
+      (
+        ${submittedAt}::timestamptz
+        AT TIME ZONE 'America/New_York'
+      )::date - INTERVAL '7 days'
+    ) AT TIME ZONE 'America/New_York'
+      AND isi.created_at < (
+        (
+          ${submittedAt}::timestamptz
+          AT TIME ZONE 'America/New_York'
+        )::date::timestamp
+      ) AT TIME ZONE 'America/New_York'
+    GROUP BY isi.product_id
   `) as SevenDayDifferenceRow[];
 
-  const sevenDayDifferenceByProduct = new Map(
-    sevenDayDifferences.map((row) => [
-      row.product_id,
-      Number(row.total_difference ?? 0),
-    ]),
-  );
+  const summaryByProduct = new Map<string, ReportSummaryRow>();
 
-  const summaryRows: ReportSummaryRow[] = submissionItems.map((item) => ({
-    productName: item.product_name,
-    squareCount: item.square_count,
-    physicalCount: item.physical_count,
-    difference: item.difference,
-    sevenDayDifference:
-      sevenDayDifferenceByProduct.get(item.product_id) ?? item.difference,
-    adjustment:
-      item.label === "Lost" || item.label === "Inventory Received"
-        ? item.label
-        : "None",
-  }));
+  for (const row of sevenDayDifferences) {
+    summaryByProduct.set(row.product_id, {
+      productName: row.product_name,
+      squareCount: null,
+      physicalCount: null,
+      difference: 0,
+      sevenDayDifference: Number(row.total_difference ?? 0),
+      adjustment: "None",
+    });
+  }
+
+  for (const item of submissionItems) {
+    const existing = summaryByProduct.get(item.product_id);
+
+    summaryByProduct.set(item.product_id, {
+      productName: item.product_name,
+      squareCount: Number(item.square_count),
+      physicalCount: Number(item.physical_count),
+      difference: Number(item.difference),
+      sevenDayDifference: existing?.sevenDayDifference ?? 0,
+      adjustment:
+        item.label === "Lost" || item.label === "Inventory Received"
+          ? item.label
+          : "None",
+    });
+  }
+
+  const summaryRows = Array.from(summaryByProduct.values()).sort((a, b) =>
+    a.productName.localeCompare(b.productName),
+  );
 
   const entryRows: ReportEntryRow[] = entries.map((entry) => ({
     time: new Date(entry.created_at).toLocaleTimeString("en-US", {
@@ -102,7 +130,7 @@ export async function buildInventoryReportData({
       timeZone: "America/New_York",
     }),
     productName: entry.product_name,
-    quantity: entry.quantity,
+    quantity: Number(entry.quantity),
     rawText: entry.raw_text,
     source: entry.source === "voice" ? "voice" : "typed",
   }));
