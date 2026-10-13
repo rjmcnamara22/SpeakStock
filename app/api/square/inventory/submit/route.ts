@@ -158,7 +158,7 @@ export async function POST(request: Request) {
   );
 `;
 
-    for (const item of adjustmentItems) {
+    for (const item of validItems) {
       await sql`
     INSERT INTO inventory_submission_items (
       id,

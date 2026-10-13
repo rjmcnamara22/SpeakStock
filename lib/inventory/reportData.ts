@@ -1,4 +1,5 @@
 import { sql } from "@/lib/db/client";
+import { loadSquareProducts } from "@/lib/inventory/loadSquareProducts";
 import type {
   ReportEntryRow,
   ReportSummaryRow,
@@ -56,6 +57,7 @@ export async function buildInventoryReportData({
 
   const entries = (await sql`
     SELECT
+      product_id,
       created_at,
       product_name,
       quantity,
@@ -64,7 +66,7 @@ export async function buildInventoryReportData({
     FROM inventory_entries
     WHERE submission_id = ${submissionId}
     ORDER BY created_at ASC
-  `) as EntryRow[];
+`) as EntryRow[];
 
   const sevenDayDifferences = (await sql`
     SELECT
@@ -87,6 +89,7 @@ export async function buildInventoryReportData({
           AT TIME ZONE 'America/New_York'
         )::date::timestamp
       ) AT TIME ZONE 'America/New_York'
+      AND isi.difference <> 0
     GROUP BY isi.product_id
   `) as SevenDayDifferenceRow[];
 
@@ -106,6 +109,10 @@ export async function buildInventoryReportData({
   for (const item of submissionItems) {
     const existing = summaryByProduct.get(item.product_id);
 
+    if (Number(item.difference) === 0 && !existing) {
+      continue;
+    }
+
     summaryByProduct.set(item.product_id, {
       productName: item.product_name,
       squareCount: Number(item.square_count),
@@ -117,6 +124,18 @@ export async function buildInventoryReportData({
           ? item.label
           : "None",
     });
+  }
+
+  const squareProducts = await loadSquareProducts();
+
+  const squareCountByProduct = new Map(
+    squareProducts.map((product) => [product.id, product.squareCount]),
+  );
+
+  for (const [productId, row] of summaryByProduct) {
+    if (row.squareCount === null) {
+      row.squareCount = squareCountByProduct.get(productId) ?? null;
+    }
   }
 
   const summaryRows = Array.from(summaryByProduct.values()).sort((a, b) =>
