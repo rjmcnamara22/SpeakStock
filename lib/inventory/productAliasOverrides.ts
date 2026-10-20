@@ -76,9 +76,9 @@ export const productAliasOverrides: Record<string, string[]> = {
     "electro lime best day",
   ],
 
-  "n/a guinness 0": ["guinness 0", "guinness zero"],
+  "n/a guinness 0": ["na guinness", "n/a guinness"],
 
-  "n/a heineken": ["heineken 0", "heineken zero"],
+  "n/a heineken": ["na heineken", "n/a heineken"],
 
   narragansett: ["narragansett", "narragansett beer"],
 
