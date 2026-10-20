@@ -94,6 +94,7 @@ const ALLOWED_CATEGORY_NAMES = new Set([
   "draft",
   "gin",
   "liqueur",
+  "n/a beers",
   "rum",
   "tequila",
   "vodka",
@@ -292,8 +293,12 @@ function removeInventoryDescriptorWords(value: string): string {
 function getExplicitAliases(name: string): string[] {
   const normalizedName = normalizeAlias(name);
 
+  const matchingOverride = Object.entries(productAliasOverrides).find(
+    ([productName]) => normalizeAlias(productName) === normalizedName,
+  );
+
   return Array.from(
-    new Set((productAliasOverrides[normalizedName] ?? []).map(normalizeAlias)),
+    new Set((matchingOverride?.[1] ?? []).map(normalizeAlias)),
   ).filter(Boolean);
 }
 

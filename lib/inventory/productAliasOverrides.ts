@@ -68,7 +68,7 @@ export const productAliasOverrides: Record<string, string[]> = {
 
   "n/a blue moon": ["non alcoholic blue moon", "NA Blue Moon", "N A Blue Moon"],
 
-  "n/a electro-lime best day": [
+  "N/A Electro-Lime Best Day": [
     "non alcoholic lime",
     "NA Electro Lime",
     "N A Electro Lime",
