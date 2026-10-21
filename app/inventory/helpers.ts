@@ -1,10 +1,11 @@
 import type {
+  CountEntry,
   InventoryProduct,
   InventorySubmissionPreview,
   InventorySummaryRow,
 } from "@/types/inventory";
 
-type SquareInventoryHistoryItem = {
+export type SquareInventoryHistoryItem = {
   id?: string;
   type: "ADJUSTMENT" | "UNKNOWN";
   catalogObjectId?: string;
@@ -19,6 +20,15 @@ type SquareInventoryHistoryItem = {
   label: "Lost" | "Inventory Received" | "Other";
 };
 
+export function getProductCount(
+  entries: CountEntry[],
+  productId: string,
+): number {
+  return entries
+    .filter((entry) => entry.productId === productId)
+    .reduce((total, entry) => total + entry.quantity, 0);
+}
+
 export function buildSubmissionPreview(
   discrepancyRows: InventorySummaryRow[],
 ): InventorySubmissionPreview[] {
@@ -32,29 +42,16 @@ export function buildSubmissionPreview(
   }));
 }
 
-export function formatHistoricalEntryDate(value: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(new Date(value));
+export function getSubmissionLabel(
+  difference: number,
+): "Lost" | "Inventory Received" {
+  return difference < 0 ? "Lost" : "Inventory Received";
 }
 
-export function formatHistoryDate(value?: string): string {
-  if (!value) {
-    return "Unknown time";
-  }
-
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
-export function formatSubmittedSessionDate(value: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+export function getDifferenceLabel(difference: number): string {
+  if (difference < 0) return "Lost";
+  if (difference > 0) return "Inventory Received";
+  return "No correction";
 }
 
 export function getAdjustmentActionText(difference: number): string {
@@ -69,10 +66,26 @@ export function getAdjustmentActionText(difference: number): string {
   return "No correction";
 }
 
-export function getDifferenceLabel(difference: number): string {
-  if (difference < 0) return "Lost";
-  if (difference > 0) return "Inventory Received";
-  return "No correction";
+export function formatHistoryDate(value?: string): string {
+  if (!value) {
+    return "Unknown time";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+export function formatHistoricalEntryDate(value: string): string {
+  return formatHistoryDate(value);
+}
+
+export function formatSubmittedSessionDate(value: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
 }
 
 export function getHistoryItemTitle(item: SquareInventoryHistoryItem): string {
@@ -104,10 +117,4 @@ export function getProductNameForHistoryItem(
   );
 
   return product?.name ?? item.catalogObjectId ?? "Unknown product";
-}
-
-export function getSubmissionLabel(
-  difference: number,
-): "Lost" | "Inventory Received" {
-  return difference < 0 ? "Lost" : "Inventory Received";
 }

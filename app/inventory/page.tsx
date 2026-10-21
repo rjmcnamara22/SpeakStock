@@ -21,8 +21,10 @@ import {
   getAdjustmentActionText,
   getDifferenceLabel,
   getHistoryItemTitle,
+  getProductCount,
   getProductNameForHistoryItem,
 } from "./helpers";
+import type { SquareInventoryHistoryItem } from "./helpers";
 
 type CollapsibleSectionProps = {
   title: string;
@@ -80,21 +82,6 @@ type SpeechRecognitionLike = {
 
 type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
 
-type SquareInventoryHistoryItem = {
-  id?: string;
-  type: "ADJUSTMENT" | "UNKNOWN";
-  catalogObjectId?: string;
-  locationId?: string;
-  quantity?: string;
-  fromState?: string;
-  toState?: string;
-  occurredAt?: string;
-  calculatedAt?: string;
-  referenceId?: string;
-  source?: string;
-  label: "Lost" | "Inventory Received" | "Other";
-};
-
 type SquareInventoryHistoryResponse = {
   success?: boolean;
   count?: number;
@@ -117,12 +104,6 @@ declare global {
 }
 
 const INVENTORY_ENTRIES_STORAGE_KEY = "speakstock_inventory_entries";
-
-function getProductCount(entries: CountEntry[], productId: string): number {
-  return entries
-    .filter((entry) => entry.productId === productId)
-    .reduce((total, entry) => total + entry.quantity, 0);
-}
 
 function CollapsibleSection({
   title,
@@ -182,6 +163,14 @@ export default function InventoryPage() {
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [submittedSessionSummary, setSubmittedSessionSummary] =
     useState<SubmittedSessionSummary | null>(null);
+  const [historicalEntries, setHistoricalEntries] = useState<
+    HistoricalInventoryEntry[]
+  >([]);
+  const [isLoadingHistoricalEntries, setIsLoadingHistoricalEntries] =
+    useState(false);
+  const [historicalEntriesError, setHistoricalEntriesError] = useState<
+    string | null
+  >(null);
   const summaryRows = useMemo(() => {
     return buildInventorySummary(products, entries);
   }, [products, entries]);
@@ -210,14 +199,6 @@ export default function InventoryPage() {
       value: pendingAdjustmentCount,
     },
   ];
-  const [historicalEntries, setHistoricalEntries] = useState<
-    HistoricalInventoryEntry[]
-  >([]);
-  const [isLoadingHistoricalEntries, setIsLoadingHistoricalEntries] =
-    useState(false);
-  const [historicalEntriesError, setHistoricalEntriesError] = useState<
-    string | null
-  >(null);
 
   async function loadAdminStatus() {
     try {
@@ -227,6 +208,33 @@ export default function InventoryPage() {
       setIsAdmin(data.isAdmin === true);
     } catch {
       setIsAdmin(false);
+    }
+  }
+
+  async function loadProducts() {
+    try {
+      setIsLoadingProducts(true);
+      setProductsError(null);
+
+      const response = await fetch("/api/square/products");
+
+      if (!response.ok) {
+        throw new Error("Failed to load products from Square.");
+      }
+
+      const data = (await response.json()) as {
+        products?: InventoryProduct[];
+      };
+
+      setProducts(data.products ?? []);
+    } catch (caughtError) {
+      if (caughtError instanceof Error) {
+        setProductsError(caughtError.message);
+      } else {
+        setProductsError("Something went wrong while loading products.");
+      }
+    } finally {
+      setIsLoadingProducts(false);
     }
   }
 
@@ -291,33 +299,6 @@ export default function InventoryPage() {
     }
   }
 
-  async function loadProducts() {
-    try {
-      setIsLoadingProducts(true);
-      setProductsError(null);
-
-      const response = await fetch("/api/square/products");
-
-      if (!response.ok) {
-        throw new Error("Failed to load products from Square.");
-      }
-
-      const data = (await response.json()) as {
-        products?: InventoryProduct[];
-      };
-
-      setProducts(data.products ?? []);
-    } catch (caughtError) {
-      if (caughtError instanceof Error) {
-        setProductsError(caughtError.message);
-      } else {
-        setProductsError("Something went wrong while loading products.");
-      }
-    } finally {
-      setIsLoadingProducts(false);
-    }
-  }
-
   useEffect(() => {
     if (!hasLoadedEntries) {
       return;
@@ -378,9 +359,10 @@ export default function InventoryPage() {
 
       const parsedCommand = parseCountCommand(command);
       const matchedProduct = matchProduct(parsedCommand.productText, products);
-      const currentProductCount = entries
-        .filter((entry) => entry.productId === matchedProduct.product.id)
-        .reduce((total, entry) => total + entry.quantity, 0);
+      const currentProductCount = getProductCount(
+        entries,
+        matchedProduct.product.id,
+      );
 
       const updatedProductCount = currentProductCount + parsedCommand.quantity;
 
@@ -469,20 +451,6 @@ export default function InventoryPage() {
     }, 4000);
   }
 
-  function handleClearSession() {
-    if (isSavingEntry) {
-      return;
-    }
-
-    setEntries([]);
-    setError(null);
-    setVoiceError(null);
-    setSuccessMessage(null);
-    setSubmissionPreview(null);
-    setIsReviewConfirmed(false);
-    window.localStorage.removeItem(INVENTORY_ENTRIES_STORAGE_KEY);
-  }
-
   function handleDeleteEntry(entryId: string) {
     if (isSavingEntry) {
       return;
@@ -524,6 +492,20 @@ export default function InventoryPage() {
     );
     setSubmissionPreview(null);
     setIsReviewConfirmed(false);
+  }
+
+  function handleClearSession() {
+    if (isSavingEntry) {
+      return;
+    }
+
+    setEntries([]);
+    setError(null);
+    setVoiceError(null);
+    setSuccessMessage(null);
+    setSubmissionPreview(null);
+    setIsReviewConfirmed(false);
+    window.localStorage.removeItem(INVENTORY_ENTRIES_STORAGE_KEY);
   }
 
   function handlePreviewSubmission() {
